@@ -27,18 +27,17 @@ uv run python -m tools.demo
 
 The demo tool sends one Choice question and prints a probability bar per option.
 
-The 4B Instruct model is the default. To use the smaller pinned model, start
-the server with:
+The 1.7B model is the `default` profile. To use the pinned 4B Instruct model,
+start the server with:
 
 ```bash
-SYSTEM_MODEL=mlx-community/Qwen3-1.7B-4bit \
-  uv run uvicorn system_one_lite.api:app --port 8010
+SYSTEM_ONE_MODEL=larger uv run uvicorn system_one_lite.api:app --port 8010
 ```
 
 Tools take the same model through `--model`:
 
 ```bash
-uv run python -m tools.demo --model mlx-community/Qwen3-1.7B-4bit
+uv run python -m tools.demo --model larger
 ```
 
 To compare warmed engine latency for a request with one question and a request
@@ -105,11 +104,11 @@ EOF
 ## 3. Read the response
 
 This is a rounded response from a local run of that request (a warm
-`Qwen3-4B-Instruct-2507-4bit` engine):
+`Qwen3-1.7B-4bit` engine):
 
 ```json
 {
-  "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+  "model": "mlx-community/Qwen3-1.7B-4bit",
   "answers": {
     "topic": {
       "type": "choice",
@@ -137,7 +136,7 @@ This is a rounded response from a local run of that request (a warm
       "noul": 0.0
     }
   },
-  "usage": { "input_tokens": 367, "output_tokens": 0 }
+  "usage": { "input_tokens": 379, "output_tokens": 0 }
 }
 ```
 

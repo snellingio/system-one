@@ -1,7 +1,7 @@
 """Spike CLI: one Choice question through the engine.
 
 Run:
-    uv run python -m tools.demo [--model mlx-community/Qwen3-4B-Instruct-2507-4bit]
+    uv run python -m tools.demo [--model default|larger]
 """
 
 import argparse

@@ -3,6 +3,7 @@
 Run with ``uv run uvicorn system_one_lite.api:app --port 8010``.
 """
 
+import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from threading import BoundedSemaphore
@@ -21,6 +22,11 @@ from .schemas import (
     ScoreAnswer,
     Usage,
 )
+
+
+def configured_engine():
+    """Build the process-wide engine from a named profile or exact model ID."""
+    return Engine(os.environ.get("SYSTEM_ONE_MODEL"))
 
 
 def labels_for(question):
@@ -107,4 +113,4 @@ def create_app(
     return app
 
 
-app = create_app()
+app = create_app(engine_factory=configured_engine)

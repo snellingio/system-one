@@ -8,6 +8,7 @@ from mlx_lm.utils import load_tokenizer
 from system_one_lite import engine as engine_module
 from system_one_lite.engine import (
     DEFAULT_MODEL,
+    LARGER_MODEL,
     MODEL_REVISIONS,
     QWEN3_1_7B_MODEL,
     Engine,
@@ -22,8 +23,8 @@ from system_one_lite.prompts import chat_filled
 @pytest.fixture(scope="module")
 def engine_contract():
     model_path, revision = resolve_model_snapshot(DEFAULT_MODEL, tokenizer_only=True)
-    assert (model_path / "chat_template.jinja").is_file()
     tokenizer = load_tokenizer(model_path)
+    assert tokenizer.chat_template
     registry_file, codes, token_ids = load_code_registry(
         DEFAULT_MODEL, tokenizer, model_path, revision
     )
@@ -38,6 +39,15 @@ def engine_contract():
     engine.context_window = 32_768
     engine.template = partial(chat_filled, tokenizer, codes=codes)
     return engine
+
+
+@pytest.mark.parametrize("model_id", [DEFAULT_MODEL, LARGER_MODEL])
+def test_shipped_model_registry_matches_tokenizer(model_id):
+    model_path, revision = resolve_model_snapshot(model_id, tokenizer_only=True)
+    tokenizer = load_tokenizer(model_path)
+    _, codes, token_ids = load_code_registry(model_id, tokenizer, model_path, revision)
+    assert len(codes) == 578
+    assert len(set(token_ids)) == 578
 
 
 def test_model_registry_is_complete(engine_contract):
@@ -78,9 +88,9 @@ def test_small_model_uses_non_thinking_prompt():
 
 
 def test_model_can_be_selected_by_environment(monkeypatch):
-    monkeypatch.setenv("SYSTEM_MODEL", QWEN3_1_7B_MODEL)
+    monkeypatch.setenv("SYSTEM_ONE_MODEL", "larger")
 
-    assert configured_model() == QWEN3_1_7B_MODEL
+    assert configured_model() == LARGER_MODEL
     assert configured_model(DEFAULT_MODEL) == DEFAULT_MODEL
 
 

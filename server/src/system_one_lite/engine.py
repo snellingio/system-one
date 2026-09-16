@@ -27,8 +27,10 @@ MODEL_REVISIONS = {
     QWEN3_1_7B_MODEL: "3b1b1768f8f8cf8351c712464f906e86c2b8269e",
     QWEN3_4B_MODEL: "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
 }
-DEFAULT_MODEL = QWEN3_4B_MODEL
-CODES_FILE = files("system_one_lite.data").joinpath("qwen3_4b_instruct_2507_4bit_answer_codes.json")
+DEFAULT_MODEL = QWEN3_1_7B_MODEL
+LARGER_MODEL = QWEN3_4B_MODEL
+MODEL_PROFILES = {"default": DEFAULT_MODEL, "larger": LARGER_MODEL}
+CODES_FILE = files("system_one_lite.data").joinpath("qwen3_1_7b_4bit_answer_codes.json")
 TEMPERATURE = 0.7
 MAX_PROMPT_TOKENS = 32_768
 MAX_TOTAL_INPUT_TOKENS = 131_072
@@ -56,9 +58,15 @@ class TooManyOptions(RequestContractError):
     pass
 
 
+def resolve_model_id(model_id):
+    """Expand a built-in profile name, or keep an exact model ID or path."""
+    return MODEL_PROFILES.get(model_id, model_id)
+
+
 def configured_model(model_id=None):
     """Return an explicit model, the environment setting, or the default."""
-    return model_id or os.environ.get("SYSTEM_MODEL") or DEFAULT_MODEL
+    selected = model_id or os.environ.get("SYSTEM_ONE_MODEL") or os.environ.get("SYSTEM_MODEL")
+    return resolve_model_id(selected or "default")
 
 
 def common_prefix_len(a, b):

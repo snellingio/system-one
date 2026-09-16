@@ -75,9 +75,8 @@ uv sync
 uv run uvicorn system_one_lite.api:app --port 8010
 ```
 
-The first launch downloads
-`mlx-community/Qwen3-4B-Instruct-2507-4bit` and compiles its Metal kernels.
-Then give it a state and a decision:
+The first start loads `mlx-community/Qwen3-1.7B-4bit` and compiles the
+Metal kernels. Then send a request:
 
 ```bash
 curl -s http://127.0.0.1:8010/evaluate \
@@ -108,7 +107,7 @@ One request comes back ready for code:
 
 ```json
 {
-  "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+  "model": "mlx-community/Qwen3-1.7B-4bit",
   "answers": {
     "team": {
       "type": "choice",
@@ -140,18 +139,29 @@ For a longer example with all three question types, open the
 
 ## Pick the model
 
-The default is the 4B Instruct model above. Use the smaller Qwen 3 1.7B model
-with one environment setting:
+The 1.7B model is the `default` profile. The 4B Instruct model is the
+`larger` profile. Download either model before a run:
 
 ```bash
-SYSTEM_MODEL=mlx-community/Qwen3-1.7B-4bit \
-  uv run uvicorn system_one_lite.api:app --port 8010
+uv run python -m tools.download_model default
+uv run python -m tools.download_model larger
 ```
 
-Both model repositories are pinned to exact commits. Each model has its own
-checked-in answer-code registry. The 1.7B prompt also turns thinking off, so
-both models use the same answer slot and API. Change models only after you run
-the same accuracy and option-order checks on both.
+The demo, benchmark, and eval tools accept either profile. For example:
+
+```bash
+uv run python -m tools.evals --model larger --limit 20
+```
+
+The server uses `default` unless `SYSTEM_ONE_MODEL` selects another profile:
+
+```bash
+SYSTEM_ONE_MODEL=larger uv run uvicorn system_one_lite.api:app --port 8010
+```
+
+Both model repositories are pinned to exact commits and have checked-in
+answer-code registries. Change models only after you run the same accuracy and
+option-order checks on both.
 
 ## The trick is almost offensively simple
 
@@ -184,9 +194,9 @@ uv run python -m tools.evals --limit 20
 ```
 
 The report shows accuracy by question type. It also rotates Choice options and
-checks whether changing their order changes the winner. The public dataset is
-the next release step and is not in Git yet. For now, place local JSONL files
-under `datasets/`, or pass another directory with `--datasets`.
+checks whether changing their order changes the winner. The repository includes
+generated examples, public benchmark samples, and game states with exact or
+policy-derived labels under [`datasets/`](datasets/README.md).
 
 Better yet, add examples from your own traffic. A decision system earns trust
 on the states it will actually see, not on a launch graphic.
@@ -207,7 +217,7 @@ change it.
 
 System One Lite is an experiment, not a production decision service.
 
-- The default 4B model is small. It will not match a frontier model on hard
+- The default 1.7B model is small. It will not match a frontier model on hard
   judgments.
 - The returned probabilities are model scores. They are **not calibrated odds
   of being correct**.
