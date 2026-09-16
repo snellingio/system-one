@@ -19,6 +19,7 @@ import mlx.core as mx
 from huggingface_hub import snapshot_download
 from mlx_lm import load
 
+from .errors import RequestContractError, TooManyOptions
 from .prompts import chat_filled
 
 QWEN3_1_7B_MODEL = "mlx-community/Qwen3-1.7B-4bit"
@@ -48,14 +49,6 @@ ANSWER_CODE_CANDIDATES = tuple(string.ascii_uppercase) + tuple(
     a + b for a in string.ascii_uppercase for b in string.ascii_uppercase
 )
 _REGISTERED_IDS = object()
-
-
-class RequestContractError(ValueError):
-    pass
-
-
-class TooManyOptions(RequestContractError):
-    pass
 
 
 def resolve_model_id(model_id):

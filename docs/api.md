@@ -14,8 +14,12 @@ a typed answer for every question, keyed by the IDs you chose.
 | `questions` | `map<string, Question>` | yes | At least one entry. Each key is an ID you pick; the answer comes back under it. The engine never sees your IDs. |
 
 There is no `model` field. The engine is fixed for the life of the server
-process. Set `SYSTEM_ONE_MODEL=default` or `SYSTEM_ONE_MODEL=larger` before
-startup. The response's `model` field reports the exact model that answered.
+process. `SYSTEM_ONE_BACKEND=mlx` is the default. Set it to `nli` to use the
+experimental OpenJEV backend. `SYSTEM_ONE_MODEL` selects an MLX profile or
+model. `SYSTEM_ONE_NLI_MODEL`, `SYSTEM_ONE_NLI_SUBFOLDER`, and
+`SYSTEM_ONE_NLI_REVISION` select an NLI checkpoint. The response's `model`
+field reports the exact checkpoint that answered. A custom NLI model needs an
+explicit revision.
 
 IDs only route answers back to your code. Two requests can use the same option
 names with different IDs, and renaming an ID never changes the probabilities.
@@ -35,7 +39,7 @@ Chooses one option from your list.
 | --- | --- | --- | --- |
 | `type` | `"choice"` | yes | |
 | `instructions` | `string \| object \| array` | yes | What to decide. |
-| `criteria` | `map<string, Content \| null>` | yes | At least one option. Option name → description. `null` means the name says it all. The model sees both the name and description. Options are answer-coded `A`–`Z`, then `AA`, `AB`, …; at most 578 options. |
+| `criteria` | `map<string, Content \| null>` | yes | At least one option. Option name → description. `null` means the name says it all. The model sees both the name and description. The MLX backend supports at most 578 options in one Choice. The NLI backend allows 4,096 candidates across the whole request. |
 
 ```json
 "language": {
@@ -99,7 +103,7 @@ How likely the statement is to be true.
 | --- | --- | --- |
 | `model` | `string` | The engine's own model ID. The default is `mlx-community/Qwen3-1.7B-4bit`. |
 | `answers` | `map<string, Answer>` | One answer per question, keyed by your IDs, in request order. |
-| `usage.input_tokens` | `integer` | Total tokens evaluated across the independent question prompts. |
+| `usage.input_tokens` | `integer` | Tokens processed by the selected backend. MLX counts each independent question prompt. NLI counts each candidate pair, with reused prefix tokens counted once per candidate batch when prefix caching is on. |
 | `usage.output_tokens` | `integer` | Always 0. Nothing is generated. |
 
 ### Choice answer
@@ -141,16 +145,17 @@ use an array of error objects.
 | Unknown `type` | Must be `choice`, `score`, or `noul`. |
 | Unknown request field | Misspelled and unsupported fields are rejected. |
 | Choice with no options | A Choice needs at least one option. |
-| More options in a Choice than the engine has answer codes | Each option needs its own single-token answer code (`A`–`Z`, then two-letter codes). The model registry holds 578. |
+| More options in a Choice than the MLX engine has answer codes | Each option needs its own single-token answer code (`A`–`Z`, then two-letter codes). The model registry holds 578. |
+| More than 4,096 NLI candidates | The NLI limit counts every Choice option, Score level, and Noul side in the request. |
 | Fewer than 2 or more than 10 Score levels | The schema enforces both bounds. |
 | Content or ID over its character limit | State: 100,000; instructions and each criterion: 20,000; IDs and option names: 200. |
 | Request content over 1,000,000 bytes | The combined validated request must stay within the aggregate limit. |
-| Prompt or request over its token limit | Each prompt may use at most 32,768 tokens; one request may use at most 131,072 input tokens. |
+| MLX prompt or request over its token limit | Each prompt may use at most 32,768 tokens; one request may use at most 131,072 input tokens. |
+| NLI pair over its token limit | Each formatted premise-hypothesis pair may use at most 4,096 tokens by default. Set `SYSTEM_ONE_NLI_MAX_LENGTH` to change this limit. |
 
-If an answer code does not land as a single token, the server returns `422`.
-You get an error, never a wrong answer.
+With the MLX backend, an invalid single-token answer code returns `422`.
 
 Only one inference request runs at a time. If the engine is already in use,
 the server returns `503` with `detail: "the inference engine is busy"`.
-Each question uses a full independent prompt. `usage.input_tokens` counts
-the state again for each question.
+MLX uses a full prompt for each question. NLI uses one pair for each candidate.
+Without prefix caching, both backends process the state more than once.

@@ -10,7 +10,7 @@ from threading import BoundedSemaphore
 
 from fastapi import FastAPI, HTTPException
 
-from .engine import Engine, RequestContractError
+from .errors import RequestContractError
 from .prompts import as_text, confidence, label
 from .schemas import (
     ChoiceAnswer,
@@ -24,9 +24,26 @@ from .schemas import (
 )
 
 
+def build_mlx_engine(model_id=None):
+    from .engine import Engine
+
+    return Engine(model_id)
+
+
+def build_nli_engine(model_id=None):
+    from .nli_engine import NLIEngine
+
+    return NLIEngine(model_id)
+
+
 def configured_engine():
-    """Build the process-wide engine from a named profile or exact model ID."""
-    return Engine(os.environ.get("SYSTEM_ONE_MODEL"))
+    """Build the selected process-wide inference backend."""
+    backend = os.environ.get("SYSTEM_ONE_BACKEND", "mlx")
+    if backend == "mlx":
+        return build_mlx_engine(os.environ.get("SYSTEM_ONE_MODEL"))
+    if backend == "nli":
+        return build_nli_engine(os.environ.get("SYSTEM_ONE_NLI_MODEL"))
+    raise ValueError(f"unknown SYSTEM_ONE_BACKEND: {backend!r}")
 
 
 def labels_for(question):
@@ -63,8 +80,8 @@ def answer_for(question, probabilities):
 
 
 def create_app(
-    engine: Engine | None = None,
-    engine_factory: Callable[[], Engine] = Engine,
+    engine=None,
+    engine_factory: Callable[[], object] = build_mlx_engine,
 ) -> FastAPI:
     """Create an app whose model loads during startup, not module import."""
 
