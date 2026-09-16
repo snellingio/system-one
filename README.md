@@ -1,76 +1,74 @@
 # System One Lite
 
-A tiny project that turns a normal local LLM into a typed decision engine. It
-needs no fine-tuning, text generation, or parser. [Read the docs](docs/index.md).
+System One Lite is a proof-of-concept HTTP service for constrained decisions
+with a local language model. Send text or JSON plus one or more typed questions.
+The service returns probabilities over the answers you declared.
 
-![How System One Lite works](docs/assets/how-system-one-lite-works-v3.png)
+It does not generate a text response or parse model-written JSON. It reads the
+model's scores at a fixed answer position and returns a validated response.
 
-## Stop asking language models to write. Start making them decide.
+![System One Lite request flow](docs/assets/how-system-one-lite-works-v3.png)
 
-Language models are brilliant at producing text. Software does not want text.
-It wants a route, a score, a yes or no, and an honest signal when the answer is
-unclear.
+## What is it for?
 
-So why are we still asking models to write tiny essays? We parse those essays
-back into data, validate the data, retry failures, and hope nothing goes off the
-rails.
+System One Lite is intended for narrow tasks whose possible answers are known
+in advance, such as:
 
-**System One Lite deletes the essay.**
+- routing a support request to a team;
+- scoring urgency on an ordered scale;
+- deciding whether a record needs human review; or
+- combining several model judgments in application code.
 
-Send one unstructured state plus up to 64 typed questions. A local model scores
-only the answers you allow and returns a probability distribution for every
-question.
+It is not a general chat API, a text generator, or a multi-step reasoning
+system. It is an independent experiment built with stock open-weight models
+and MLX.
 
-**Unstructured state in. Typed probabilities out. Zero generated tokens.**
+## What can it return?
 
-No free-form response. No JSON repair loop. No invented option that your code
-has never heard of.
+Each question uses one of three types:
 
-This is an independent proof of concept.
-
-It uses the System One Models interface.
-It is not a new foundation model. It runs a stock open-weight model with MLX.
-The project tests simpler AI software where the model can only decide.
-
-## The old stack is absurd
-
-| | A normal LLM feature | System One Lite |
+| Type | Use | Result |
 | --- | --- | --- |
-| Input | Unstructured text | Unstructured text or JSON |
-| Output | A generated string | A typed answer over declared options |
-| Uncertainty | A guess written in prose | The full probability distribution |
-| Validation | Parse, validate, retry | Constrained by construction |
-| Output tokens | One token at a time | **Zero** |
-| Failure mode | Malformed data or invented values | A valid answer that may still be wrong |
-| Deployment | Usually a hosted model | A fixed local model on Apple silicon |
+| [Choice](docs/primitives/choice.md) | Select one item from a closed set | Winning key, probability for every option, and confidence |
+| [Score](docs/primitives/score.md) | Place the state on an ordered scale | Probability-weighted score, probability for every level, and confidence |
+| [Noul](docs/primitives/noul.md) | Judge a yes-or-no statement | Probability of yes |
 
-The final row matters. System One Lite does not make a small model infallible.
-It makes the limit between the model and your code brutally clear. The
-model can choose the wrong declared answer. It cannot create a new one.
+`Noul` is the project's name for a boolean judgment with uncertainty. A value
+of `0.9` means the model assigned 90% of the allowed probability mass to
+`yes`. It does not mean the answer has been calibrated to be correct 90% of
+the time.
 
-That is the difference between asking AI to behave like an API and giving it
-an interface it cannot break.
+## How does it work?
 
-## Three primitives. A ridiculous number of decisions.
+For each question, the server:
 
-| Type | Ask it to | Get back |
-| --- | --- | --- |
-| [Choice](docs/primitives/choice.md) | Pick from a closed set | Winner, probabilities, and confidence |
-| [Score](docs/primitives/score.md) | Judge a position on an ordered scale | Weighted score, level probabilities, and confidence |
-| [Noul](docs/primitives/noul.md) | Make a yes or no judgment | Probability of yes |
+1. Formats the state, instructions, and allowed answers as a prompt.
+2. Maps the allowed answers to token codes such as `A`, `B`, and `C`.
+3. Runs the model to the fixed answer position without decoding text.
+4. Keeps only the logits for valid answer codes and applies softmax.
+5. Maps those probabilities back to the answer names supplied by the caller.
 
-Route support tickets. Rank leads. Gate a workflow. Score risk. Flag content.
-Decide whether a human needs to look. Combine several small judgments into a
-larger rule that stays in ordinary code.
+Questions are evaluated independently. Each question gets its own prompt and
+another copy of the state. This prevents one answer from affecting another,
+but runtime and input-token use grow with the number and length of questions.
 
-Each question is independent. One answer cannot leak into the next. Your code,
-not a hidden chain of thought, decides what happens after the probabilities
-arrive.
+See [How it works](docs/how-it-works.md) for the prompt format, answer-code
+registry, token limits, and confidence calculation.
 
-## Watch it decide
+## Requirements
 
-System One Lite needs an Apple silicon Mac, Python 3.12 or newer, and
-[`uv`](https://docs.astral.sh/uv/). Start the server:
+- An Apple silicon Mac. The server uses MLX.
+- Python 3.12 or newer.
+- [`uv`](https://docs.astral.sh/uv/).
+- Network access on the first run to download the selected model if it is not
+  already cached.
+
+The Python SDK requires Python 3.9 or newer. The JavaScript SDK requires Node
+22.18 or newer.
+
+## Start the server
+
+From the repository root:
 
 ```bash
 cd server
@@ -78,15 +76,19 @@ uv sync
 uv run uvicorn system_one_lite.api:app --port 8010
 ```
 
-The first start loads `mlx-community/Qwen3-1.7B-4bit` and compiles the
-Metal kernels. Then send a request:
+The default profile uses `mlx-community/Qwen3-1.7B-4bit`. On first startup, the
+server downloads the pinned model revision and compiles the Metal kernels.
+
+Send a request to `POST /evaluate`:
 
 ```bash
 curl -s http://127.0.0.1:8010/evaluate \
   -H "Content-Type: application/json" \
   -d @- <<'EOF'
 {
-  "state": "My order was due Friday, but it is still in transit.",
+  "state": {
+    "message": "My order was due Friday, but it is still in transit."
+  },
   "questions": {
     "team": {
       "type": "choice",
@@ -97,6 +99,15 @@ curl -s http://127.0.0.1:8010/evaluate \
         "account": "Login, profile, or app problems"
       }
     },
+    "urgency": {
+      "type": "score",
+      "instructions": "How urgent is this request?",
+      "criteria": [
+        "Can wait",
+        "Needs attention this week",
+        "Needs attention today"
+      ]
+    },
     "needs_reply": {
       "type": "noul",
       "instructions": "Does the customer need a reply?"
@@ -106,7 +117,7 @@ curl -s http://127.0.0.1:8010/evaluate \
 EOF
 ```
 
-One request comes back ready for code:
+The response has one typed answer under each question ID:
 
 ```json
 {
@@ -122,120 +133,186 @@ One request comes back ready for code:
       },
       "confidence": 0.565
     },
+    "urgency": {
+      "type": "score",
+      "score": 1.2,
+      "legend": {
+        "0": "Can wait",
+        "1": "Needs attention this week",
+        "2": "Needs attention today"
+      },
+      "probabilities": {
+        "0": 0.1,
+        "1": 0.6,
+        "2": 0.3
+      },
+      "confidence": 0.4
+    },
     "needs_reply": {
       "type": "noul",
       "noul": 0.88
     }
   },
   "usage": {
-    "input_tokens": 94,
+    "input_tokens": 220,
     "output_tokens": 0
   }
 }
 ```
 
-The numbers show the response shape. Exact values depend on the input and
-model. The shape does not.
+These values illustrate the response shape. Exact values depend on the model
+and input. `POST /v1/systemone` is an alias for the same endpoint. The
+[API reference](docs/api.md) lists every field, limit, and error response.
 
-For a longer example with all three question types, open the
-[quickstart](docs/quickstart.md).
+## Python example
 
-## Pick the model
+The local [Python SDK](sdks/python/README.md) provides synchronous and
+asynchronous clients with no runtime dependencies. This example can run from
+`sdks/python/` while the server is running:
 
-The 1.7B model is the `default` profile. The 4B Instruct model is the
-`larger` profile. Download either model before a run:
+```python
+from system_sdk import Choice, Noul, SystemClient
+
+with SystemClient() as client:
+    response = client.system_one(
+        state={
+            "order": "DB-4471",
+            "status": "in transit",
+            "due": "Friday",
+        },
+        questions={
+            "team": Choice(
+                instructions="Which team should handle this order?",
+                criteria={
+                    "deliveries": "Late, missing, or damaged orders",
+                    "billing": "Charges, refunds, or payment methods",
+                    "account": "Login, profile, or app problems",
+                },
+            ),
+            "needs_reply": Noul(
+                instructions="Does the customer need a reply?",
+            ),
+        },
+    )
+
+team = response.choices["team"]
+needs_reply = response.nouls["needs_reply"].noul
+
+if team.confidence < 0.4:
+    queue = "manual-review"
+elif needs_reply >= 0.8:
+    queue = team.choice
+else:
+    queue = "no-reply"
+
+print(queue, team.probabilities)
+```
+
+The thresholds are examples. Set them from labeled data that represents the
+traffic the application will receive.
+
+## TypeScript example
+
+Install the local [JavaScript SDK](sdks/javascript/README.md), then call the
+same server:
 
 ```bash
+npm install /path/to/system-one/sdks/javascript
+```
+
+```ts
+import { choice, noul, SystemClient } from "system-sdk";
+
+const client = new SystemClient();
+const response = await client.systemOne({
+  state: {
+    order: "DB-4471",
+    status: "in transit",
+    due: "Friday",
+  },
+  questions: {
+    team: choice("Which team should handle this order?", {
+      deliveries: "Late, missing, or damaged orders",
+      billing: "Charges, refunds, or payment methods",
+      account: "Login, profile, or app problems",
+    }),
+    needsReply: noul("Does the customer need a reply?"),
+  },
+});
+
+const team = response.answers.team;
+const queue =
+  team.confidence < 0.4
+    ? "manual-review"
+    : response.answers.needsReply.noul >= 0.8
+      ? team.choice
+      : "no-reply";
+
+console.log(queue, team.probabilities);
+```
+
+Both SDKs use `http://127.0.0.1:8010` by default. Set `SYSTEM_BASE_URL` or
+pass a base URL to the client to use another address.
+
+## Model profiles
+
+| Profile | Model |
+| --- | --- |
+| `default` | `mlx-community/Qwen3-1.7B-4bit` |
+| `larger` | `mlx-community/Qwen3-4B-Instruct-2507-4bit` |
+
+Download either pinned model revision explicitly:
+
+```bash
+cd server
 uv run python -m tools.download_model default
 uv run python -m tools.download_model larger
 ```
 
-The demo, benchmark, and eval tools accept either profile. For example:
-
-```bash
-uv run python -m tools.evals --model larger --limit 20
-```
-
-The server uses `default` unless `SYSTEM_ONE_MODEL` selects another profile:
+Select a profile before starting the server:
 
 ```bash
 SYSTEM_ONE_MODEL=larger uv run uvicorn system_one_lite.api:app --port 8010
 ```
 
-Both model repositories are pinned to exact commits and have checked-in
-answer-code registries. Change models only after you run the same accuracy and
-option-order checks on both.
+The demo, benchmark, and evaluation tools also accept `--model default` or
+`--model larger`. Each supported model has a checked-in registry of answer
+codes that must remain single tokens with the pinned tokenizer.
 
-## The trick is almost offensively simple
+## Evaluation
 
-For every question, the server:
-
-1. Writes the state, question, and allowed answers into a prompt.
-2. Assigns each answer a token code such as `A`, `B`, or `C`.
-3. Runs the model up to the answer slot without decoding any text.
-4. Throws away every logit except the valid answer codes.
-5. Applies softmax and maps the probabilities back to your labels.
-
-The model never gets the chance to ramble. It reaches the exact point where
-an answer must appear, and System One Lite reads the scores directly.
-
-Choice returns the winning label and the full distribution. Score returns the
-probability-weighted level. Noul returns the probability of `yes`. Every extra
-question gets its own full prompt, so questions cannot affect one another.
-
-Read [How it works](docs/how-it-works.md) for token alignment, option limits,
-and the reason this safe path uses one model pass per question.
-
-## Extraordinary claims, meet a local eval
-
-There is no benchmark confetti here. The repository has an eval runner for
-JSONL files that use the documented dataset envelope:
+The evaluation tool reads JSONL files in the envelope documented in
+[`datasets/README.md`](datasets/README.md). It reports accuracy by question
+type and checks whether rotating Choice options changes the result.
 
 ```bash
 cd server
 uv run python -m tools.evals --datasets /path/to/jsonl-directory --limit 20
 ```
 
-The report shows accuracy by question type. It also rotates Choice options and
-checks whether changing their order changes the winner. The public dataset is
-the next release step and is not in Git yet. Local files under `datasets/` are
-ignored, so they cannot be published by accident.
+Use labeled data from the intended application before setting routing or
+review thresholds. Synthetic examples are useful for testing the interface,
+but they do not establish production accuracy.
 
-Better yet, add examples from your own traffic. A decision system earns trust
-on the states it will actually see, not on a launch graphic.
-
-## Use it from code
-
-The repository includes two local SDKs:
-
-- [Python](sdks/python/README.md): sync and async clients with no runtime
-  dependencies. Python 3.9 or newer.
-- [JavaScript](sdks/javascript/README.md): a typed client for Node 22.18 or
-  newer.
-
-Both clients use `http://127.0.0.1:8010` by default. Set `SYSTEM_BASE_URL` to
-change it.
-
-## The part most launch posts bury
+## Limits
 
 System One Lite is an experiment, not a production decision service.
 
-- The default 1.7B model is small. It will not match a frontier model on hard
-  judgments.
-- The returned probabilities are model scores. They are **not calibrated odds
-  of being correct**.
-- Synthetic eval data does not stand in for real production traffic.
-- Every question repeats the state and runs separately. Cost grows with the
-  number and length of questions.
-- The server handles one inference request at a time and returns `503` while
+- The included 1.7B and 4B models can return the wrong allowed answer.
+- Probabilities are model scores, not calibrated odds of correctness.
+- Choice and Score confidence measures how concentrated the returned
+  distribution is. It does not measure factual accuracy.
+- Each question repeats the state and runs as a separate model pass.
+- The server handles one inference request at a time and returns `503` when
   the engine is busy.
-- The current server requires Apple silicon because it uses MLX.
+- A request can contain at most 64 questions. Choice supports at most 578
+  options, and Score supports 2 to 10 levels.
+- The current server requires Apple silicon.
 
-Use confidence to route uncertain cases. Set thresholds from labeled data that
-matches your traffic. Read [Confidence](docs/confidence.md) before you let a
-score trigger anything expensive, sensitive, or hard to undo.
+Read [Confidence](docs/confidence.md) before using a score for an expensive,
+sensitive, or hard-to-undo action.
 
-## Run every check
+## Run the checks
 
 ```bash
 cd server
@@ -254,16 +331,16 @@ npm test
 
 ## Project map
 
-| Path | What is inside |
+| Path | Contents |
 | --- | --- |
-| [`server/`](server/) | FastAPI service, MLX engine, evals, and tests |
+| [`server/`](server/) | FastAPI service, MLX engine, evaluation tools, and tests |
 | [`sdks/python/`](sdks/python/) | Python client |
 | [`sdks/javascript/`](sdks/javascript/) | TypeScript client |
 | [`docs/`](docs/) | Guides and API reference |
+| [`datasets/`](datasets/) | Dataset format and local evaluation data |
 
-Start with the [introduction](docs/introduction.md). Then read the
-[API reference](docs/api.md) for the complete request shape, limits, and error
-responses.
+Start with the [quickstart](docs/quickstart.md) for a shorter walkthrough or
+the [API reference](docs/api.md) for the complete contract.
 
 ## License
 
