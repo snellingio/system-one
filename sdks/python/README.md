@@ -35,8 +35,10 @@ needs no async HTTP dependency.
 
 Answers carry the full shape from `docs/api.md`. Choices have `choice`,
 `probabilities`, `confidence`; Scores add `score` and `legend`; Nouls are a
-single `noul` number. Errors raise `SystemRequestError` with the HTTP status and
-body.
+single `noul` number. Read every answer from `response.answers`, or use the
+`nouls`, `choices`, and `scores` views. Score legend and probability keys are
+integers after parsing. Errors raise `SystemRequestError` with the HTTP status
+and body.
 
 ## Configuration
 
@@ -48,7 +50,7 @@ body.
 ## Files
 
 - `system_sdk/questions.py` — `Noul`, `Choice`, `Score`.
-- `system_sdk/responses.py` — typed answers, split into `nouls`,
-  `choices`, and `scores`.
+- `system_sdk/responses.py` — typed `answers` plus the `nouls`, `choices`,
+  and `scores` views.
 - `system_sdk/client.py` — sync and async clients.
 - `examples/quickstart.py` — the docs example, sync and async.
