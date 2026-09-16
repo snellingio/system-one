@@ -16,7 +16,7 @@ import time
 import mlx.core as mx
 from mlx_lm.models.cache import make_prompt_cache
 
-from system_one_lite.engine import SMALL_MODEL, Engine
+from system_one_lite.engine import DEFAULT_MODEL, TEMPERATURE, Engine
 from tools.benchmark import QUESTIONS, STATE
 
 
@@ -72,7 +72,8 @@ def cached_batch(engine, jobs):
         suffix_slot = slot - len(common)
         if suffix_slot < 0 or suffix_slot >= len(suffixes[row]):
             raise ValueError("answer slot is outside the real suffix")
-        probs = mx.softmax(suffix_logits[row, suffix_slot].astype(mx.float32)[mx.array(mask)])
+        logits = suffix_logits[row, suffix_slot].astype(mx.float32)[mx.array(mask)]
+        probs = mx.softmax(logits / TEMPERATURE)
         mx.eval(probs)
         probabilities.append(probs.tolist())
 
@@ -126,7 +127,7 @@ def compare(engine, repeats, tolerance):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default=SMALL_MODEL)
+    parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--tolerance", type=float, default=1e-5)
     args = parser.parse_args()

@@ -4,7 +4,7 @@ A Choice asks which option fits and answers with one pick plus a probability
 for every option. Use it whenever the answer is a member of a closed, unordered
 set: routing, categorizing, language detection, picking a template.
 
-When the answer is a degree rather than a pick, use a [Score](score.md).
+When the answer is a degree instead of a pick, use a [Score](score.md).
 When it is plain yes/no, use a [Noul](noul.md).
 
 ## Writing one
@@ -21,10 +21,9 @@ When it is plain yes/no, use a [Noul](noul.md).
 }
 ```
 
-`criteria` maps each option name to a description of what it covers. The
-descriptions are the real classifier: the model sees both the name and the
-description, so the description is where you draw the lines between options.
-Use `null` when the name alone is unambiguous (`"english": null`).
+`criteria` maps each option name to a description. The model sees both values.
+Descriptions define the lines between options. Use `null` when the name alone
+is clear (`"english": null`).
 
 An option needs `null` or a description, never an empty string — an empty
 line in the prompt weakens that option for no reason.
@@ -38,15 +37,13 @@ Two habits that pay off:
   where you think the answer is clear, their descriptions overlap. Rewrite
   them to say what each is *not* for, or merge them and split elsewhere.
 
-Options are answer-coded `A`–`Z`, then `AA`, `AB`, and on — every code a
-single token, so the cap is 570 options on the default model, not 26. Long
-option lists work, but each option is a line in the prompt and a share of the
-softmax — describe them so the distinctions are real, and prefer ten sharp
-options to fifty fuzzy ones.
+Options use answer codes `A`–`Z`, then `AA`, `AB`, and more. Every code is one
+token. The model supports 578 options, not 26. Long lists work, but each option
+adds a prompt line. Prefer ten clear options to fifty vague ones.
 
 ## What comes back
 
-From the quickstart request against the local engine:
+An illustrative response:
 
 ```json
 "topic": {
@@ -69,10 +66,8 @@ From the quickstart request against the local engine:
 
 ## Reading the runner-up
 
-The interesting number is often the second one. In the example above,
-`billing` at 0.258 is not noise: the customer complains twice in one month,
-and billing keeps a live share of the doubt. A reasonable dispatcher does
-something with that:
+The second-highest value can matter. In this example, `billing` at 0.258 is
+large enough to consider. A dispatcher can use it like this:
 
 ```python
 topic = answers["topic"]
@@ -91,10 +86,7 @@ else:
 
 ## Order stability
 
-Options are listed `A:`, `B:`, `C:` … and read by letter
-([How it works](../how-it-works.md)), so list order can nudge probabilities
-— the eval suite rotates one question's options and requires the same
-winner. The effect is small but real: when a Choice matters, keep the
-criteria order fixed between calls, or measure your own stability the way
-`server/tools/evals.py` does (winner match plus total-variation distance under
-rotation).
+Options appear as `A:`, `B:`, `C:`, and more. The model answers by code. List
+order can change probabilities. The eval suite rotates options and checks the
+winner. Keep criteria order fixed when a Choice matters. You can also measure
+stability with `server/tools/evals.py`.

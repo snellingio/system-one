@@ -37,12 +37,7 @@ uv run python -m tools.benchmark --repeats 10
 
 The benchmark excludes model-load and initial compilation time. It prints
 prompt-building time and model time separately. Add `--json` for
-machine-readable output. Use the smaller test model with:
-
-```bash
-uv run python -m tools.benchmark \
-  --model mlx-community/Qwen2.5-1.5B-Instruct-4bit --repeats 10
-```
+machine-readable output.
 
 Test shared-prefix caching without changing the server path:
 
@@ -95,52 +90,52 @@ EOF
 
 ## 3. Read the response
 
-This is the real response from a local run of that request (a
-`Qwen3.5-2B-MLX-4bit` engine, warm):
+This is a rounded response from a local run of that request (a warm
+`Qwen3-4B-Instruct-2507-4bit` engine):
 
 ```json
 {
-  "model": "mlx-community/Qwen3.5-2B-MLX-4bit",
+  "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
   "answers": {
     "topic": {
       "type": "choice",
       "choice": "deliveries",
       "probabilities": {
-        "deliveries": 0.444,
-        "billing": 0.346,
-        "account": 0.210
+        "deliveries": 1.0,
+        "billing": 0.0,
+        "account": 0.0
       },
-      "confidence": 0.166
+      "confidence": 1.0
     },
     "frustration": {
       "type": "score",
-      "score": 0.894,
+      "score": 1.0,
       "legend": {
         "0": "Neutral, just asking a question",
         "1": "Annoyed but polite",
         "2": "Angry, ready to walk away"
       },
-      "probabilities": { "0": 0.269, "1": 0.569, "2": 0.163 },
-      "confidence": 0.353
+      "probabilities": { "0": 0.0, "1": 1.0, "2": 0.0 },
+      "confidence": 1.0
     },
     "asks_for_refund": {
       "type": "noul",
-      "noul": 0.622
+      "noul": 0.0
     }
   },
-  "usage": { "input_tokens": 275, "output_tokens": 0 }
+  "usage": { "input_tokens": 367, "output_tokens": 0 }
 }
 ```
 
 Things worth noticing:
 
-- `topic` picks `deliveries`, but `billing` holds 0.346 — the message never
-  mentions money, yet the model keeps a real share of doubt. `confidence`
-  (0.166) summarizes that spread.
-- `frustration` lands at 0.894, between "annoyed" (1) and "angry" (2). The
-  score is an average over the levels, so it can fall between them.
-- `asks_for_refund` is 0.622: leaning yes, but the customer only complains
-  about lateness, never asks for money back. The doubt is the honest answer.
+- `topic` picks `deliveries` with a sharply peaked distribution.
+- `frustration` lands on "annoyed" (1). A Score can still fall between levels
+  when its distribution is less peaked.
+- `asks_for_refund` is near zero. The customer complains about lateness but
+  never asks for money back.
+- These probabilities are model scores, not calibrated odds. A value near
+  one does not prove that an answer is correct.
 - `usage.output_tokens` is always 0. The engine never generates. Each question
   uses a full independent prompt.
 

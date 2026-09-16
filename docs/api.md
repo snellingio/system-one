@@ -34,7 +34,7 @@ Chooses one option from your list.
 | --- | --- | --- | --- |
 | `type` | `"choice"` | yes | |
 | `instructions` | `string \| object \| array` | yes | What to decide. |
-| `criteria` | `map<string, Content \| null>` | yes | At least one option. Option name → description. `null` means the name says it all. The model sees both the name and description. Options are answer-coded `A`–`Z`, then `AA`, `AB`, …; at most 570 options on the default model. |
+| `criteria` | `map<string, Content \| null>` | yes | At least one option. Option name → description. `null` means the name says it all. The model sees both the name and description. Options are answer-coded `A`–`Z`, then `AA`, `AB`, …; at most 578 options. |
 
 ```json
 "language": {
@@ -96,7 +96,7 @@ How likely the statement is to be true.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `model` | `string` | The engine's own model ID, e.g. `mlx-community/Qwen3.5-2B-MLX-4bit`. |
+| `model` | `string` | The engine's own model ID: `mlx-community/Qwen3-4B-Instruct-2507-4bit`. |
 | `answers` | `map<string, Answer>` | One answer per question, keyed by your IDs, in request order. |
 | `usage.input_tokens` | `integer` | Total tokens evaluated across the independent question prompts. |
 | `usage.output_tokens` | `integer` | Always 0. Nothing is generated. |
@@ -140,7 +140,7 @@ use an array of error objects.
 | Unknown `type` | Must be `choice`, `score`, or `noul`. |
 | Unknown request field | Misspelled and unsupported fields are rejected. |
 | Choice with no options | A Choice needs at least one option. |
-| More options in a Choice than the engine has answer codes | Each option needs its own single-token answer code (`A`–`Z`, then two-letter codes). The default model's registry holds 570. |
+| More options in a Choice than the engine has answer codes | Each option needs its own single-token answer code (`A`–`Z`, then two-letter codes). The model registry holds 578. |
 | Fewer than 2 or more than 10 Score levels | The schema enforces both bounds. |
 | Content or ID over its character limit | State: 100,000; instructions and each criterion: 20,000; IDs and option names: 200. |
 | Request content over 1,000,000 bytes | The combined validated request must stay within the aggregate limit. |

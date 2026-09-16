@@ -1,10 +1,9 @@
 """The decision engine: masked read at each answer slot.
 
-Each question is its own full sequence (state + that question). Later
-questions do not see earlier answer fillers. Full prompts are evaluated
-without a cache because this model's cached path changes its probabilities.
-Qwen3.5 also mixes GatedDeltaNet conv/SSM layers, so a right-padded batch
-moves the masked probabilities. One forward per question.
+Each question is its own full chat sequence (state + that question). Later
+questions do not see earlier answers. Full prompts are evaluated without a
+cache because the cached experiment must prove probability parity first.
+One forward pass runs per question.
 """
 
 import hashlib
@@ -19,15 +18,16 @@ import mlx.core as mx
 from huggingface_hub import snapshot_download
 from mlx_lm import load
 
-from .prompts import filled
+from .prompts import chat_filled
 
-DEFAULT_MODEL = "mlx-community/Qwen3.5-2B-MLX-4bit"
-SMALL_MODEL = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
-CODES_FILE = files("system_one_lite.data").joinpath("qwen3_5_2b_answer_codes.json")
+DEFAULT_MODEL = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+CODES_FILE = files("system_one_lite.data").joinpath("qwen3_4b_instruct_2507_4bit_answer_codes.json")
+TEMPERATURE = 0.7
 MAX_PROMPT_TOKENS = 32_768
 MAX_TOTAL_INPUT_TOKENS = 131_072
 TOKENIZER_FILES = (
     "added_tokens.json",
+    "chat_template.jinja",
     "merges.txt",
     "special_tokens_map.json",
     "tokenizer.json",
@@ -84,7 +84,7 @@ def tokenizer_sha256(model_path):
 
 def answer_code_entries(tokenizer):
     """Build the complete registry for the supported answer-code search."""
-    text, marks = filled("code registry", [("pick one", ["yes", "no"])])
+    text, marks = chat_filled(tokenizer, "code registry", [("pick one", ["yes", "no"])])
     prefix = text[: marks[0]]
     base = tokenizer.encode(prefix)
     entries, cuts = [], set()
@@ -193,7 +193,7 @@ def validate_code_contexts(tokenizer, codes, token_ids):
     )
     expected = dict(zip(codes, token_ids))
     for state, instructions, labels in cases:
-        text, marks = filled(state, [(instructions, labels)], codes=codes)
+        text, marks = chat_filled(tokenizer, state, [(instructions, labels)], codes=codes)
         actual = letter_ids_after(tokenizer, text[: marks[0]], codes)
         if actual != expected:
             raise ValueError("answer-code token IDs change across production prompt contexts")
@@ -215,7 +215,7 @@ class Engine:
             model_id, self.tokenizer, self.model_path, self.model_revision
         )
         # every question is coded from the registry, not just A-Z
-        self.template = partial(filled, codes=self.codes)
+        self.template = partial(chat_filled, self.tokenizer, codes=self.codes)
         # warm up: compile Metal kernels before the first real request
         self.evaluate("warm up", [("pick one", ["yes", "no"])])
 
@@ -278,7 +278,7 @@ class Engine:
         probs = []
         for full, slot, mask in jobs:
             logits = self.model(mx.array([full]))
-            p = mx.softmax(logits[0, slot].astype(mx.float32)[mx.array(mask)])
+            p = mx.softmax(logits[0, slot].astype(mx.float32)[mx.array(mask)] / TEMPERATURE)
             mx.eval(p)
             probs.append(p)
         t2 = time.perf_counter()

@@ -4,7 +4,12 @@ import mlx.core as mx
 import pytest
 
 from system_one_lite import engine as engine_module
-from system_one_lite.engine import MAX_PROMPT_TOKENS, RequestContractError, TooManyOptions
+from system_one_lite.engine import (
+    MAX_PROMPT_TOKENS,
+    TEMPERATURE,
+    RequestContractError,
+    TooManyOptions,
+)
 
 STATE = (
     "Hi, I've been trying to connect my Stripe account for 3 days and it keeps "
@@ -57,7 +62,7 @@ def test_two_letter_codes_past_z(engine):
     assert all(0.0 <= p <= 1.0 for p in results[0])
 
 
-@pytest.mark.parametrize("option_count", [27, 255, 570])
+@pytest.mark.parametrize("option_count", [27, 255, 578])
 def test_large_option_contract_prepares_without_model_inference(engine, option_count):
     labels = [f"option {i}" for i in range(option_count)]
     jobs, _ = engine.prepare(STATE, [(QUESTION, labels)])
@@ -143,7 +148,7 @@ def test_production_result_matches_direct_forward_pass(engine):
     cached, _, _ = engine.evaluate(STATE, [(QUESTION, labels)])
 
     logits = engine.model(mx.array([prompt]))
-    expected = mx.softmax(logits[0, slot].astype(mx.float32)[mx.array(mask)])
+    expected = mx.softmax(logits[0, slot].astype(mx.float32)[mx.array(mask)] / TEMPERATURE)
     mx.eval(expected)
     assert cached[0] == expected.tolist()
 

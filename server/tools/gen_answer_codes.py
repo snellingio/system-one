@@ -4,10 +4,9 @@ Run:
     uv run python -m tools.gen_answer_codes [--model MODEL] [--output FILE]
 
 Scans A-Z, then AA-ZZ in lexicographic order, and keeps the codes that are
-a single token in the real slot context (the 'Answer: ' prefix that
-templates.filled builds, so they come out space-attached like ' A'), all at
-one cut position. The engine assigns option codes in file order; regenerate
-this file when the model or tokenizer changes.
+a single token in the real JSON answer slot. The engine assigns option codes
+in file order. Regenerate this file when the model, tokenizer, or prompt
+changes.
 """
 
 import argparse
@@ -53,7 +52,7 @@ def main():
         "model": args.model,
         "model_revision": revision,
         "tokenizer_sha256": tokenizer_sha256(model_path),
-        "slot_context": "codes appended after 'Answer: ' (space-attached tokens)",
+        "slot_context": "codes appended after the assistant JSON answer prefix",
         "codes": entries,
     }
     output.write_text(json.dumps(out, indent=1) + "\n")

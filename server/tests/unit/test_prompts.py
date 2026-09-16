@@ -2,7 +2,20 @@
 
 import string
 
-from system_one_lite.prompts import as_text, confidence, filled
+from system_one_lite.prompts import (
+    JSON_ANSWER_INSTRUCTION,
+    as_text,
+    chat_filled,
+    confidence,
+    filled,
+)
+
+
+class FakeTokenizer:
+    def apply_chat_template(self, messages, **kwargs):
+        assert len(messages) == 1 and messages[0]["role"] == "user"
+        assert kwargs == {"tokenize": False, "add_generation_prompt": True}
+        return f"<user>{messages[0]['content']}<assistant>"
 
 
 def test_layout_and_mark():
@@ -34,6 +47,15 @@ def test_structured_instructions_match_as_text():
     instr = {"field_spec": {"path": "price"}, "main_question": "supported?"}
     text, _ = filled("s", [(instr, ["yes", "no"])])
     assert as_text(instr) in text
+
+
+def test_chat_layout_uses_model_card_json_answer():
+    text, marks = chat_filled(FakeTokenizer(), "s", [("pick one", ["X", "Y"])])
+    assert JSON_ANSWER_INSTRUCTION in text
+    assert "A: X\nB: Y" in text
+    assert text[marks[0]] == "A"
+    assert text[: marks[0]].endswith('<assistant>{"answer": "')
+    assert text[marks[0] :] == 'A"}'
 
 
 def test_choice_label_includes_key_and_description():

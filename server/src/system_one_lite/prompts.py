@@ -1,15 +1,16 @@
-"""The answer-slot prompt template (README Tier 1).
+"""Answer-slot prompt templates.
 
-filled() builds a template with every answer slot filled with the letter
-"A". The engine now sends one question per sequence so later questions
-do not see earlier fillers. filled() still accepts several questions for
-experiments that want one concatenated prompt.
+filled() builds the plain prompt used by labeling tools. chat_filled() wraps
+one question in the model's chat template for serving.
 """
 
 import json
 import string
 
 LETTERS = string.ascii_uppercase
+JSON_ANSWER_INSTRUCTION = (
+    'Please show your choice in the answer field with only the choice letter, e.g., "answer": "C".'
+)
 
 
 def as_text(value):
@@ -63,3 +64,23 @@ def filled(state, questions, codes=LETTERS):
         marks.append(sum(len(p) for p in parts))
         parts.append("A")
     return "".join(parts), marks
+
+
+def chat_filled(tokenizer, state, questions, codes=LETTERS):
+    """Build one Qwen chat prompt with a complete JSON answer filler."""
+    if len(questions) != 1:
+        raise ValueError("the chat template accepts exactly one question")
+    instructions, labels = questions[0]
+    parts = ["State:\n" + as_text(state).strip()]
+    parts.append(f"\n\nQuestion 1: {as_text(instructions)}\n")
+    parts.append("\n".join(f"{codes[i]}: {item}" for i, item in enumerate(labels)))
+    parts.append("\n\n" + JSON_ANSWER_INSTRUCTION)
+    user_prompt = "".join(parts)
+    text = tokenizer.apply_chat_template(
+        [{"role": "user", "content": user_prompt}],
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+    text += '{"answer": "'
+    mark = len(text)
+    return text + 'A"}', [mark]

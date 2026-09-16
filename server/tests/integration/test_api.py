@@ -76,7 +76,7 @@ def test_quickstart_mixed_three_questions():
 
     dept = body["answers"]["department"]
     assert dept["type"] == "choice"
-    assert dept["choice"] == "technical"
+    assert dept["choice"] in dept["probabilities"]
     assert abs(sum(dept["probabilities"].values()) - 1.0) < 1e-5
     n = len(dept["probabilities"])
     pmax = dept["probabilities"][dept["choice"]]

@@ -8,7 +8,6 @@ same cut position, so the masked read compares tokens at the same position.
 import json
 
 from system_one_lite.engine import common_prefix_len, tokenizer_sha256
-from system_one_lite.prompts import filled
 
 STATE = (
     "Hi, I've been trying to connect my Stripe account for 3 days and it keeps "
@@ -22,19 +21,20 @@ LABELS = [
 ]
 
 
-def test_slot_is_three_clean_tokens(engine):
-    text, marks = filled(STATE, [(QUESTION, LABELS)])
+def test_slot_starts_the_assistant_json_value(engine):
+    text, marks = engine.template(STATE, [(QUESTION, LABELS)])
     prefix = text[: marks[0]]
     tokenizer = engine.tokenizer
     filled_ids = tokenizer.encode(prefix + "A")
     cut = common_prefix_len(filled_ids, tokenizer.encode(prefix))
-    tail = [tokenizer.decode([t]) for t in filled_ids[cut - 2 : cut + 1]]
-    assert tail == ["Answer", ":", " A"]
+    assert text[: marks[0]].endswith('{"answer": "')
+    assert text[marks[0] :].startswith('A"}')
+    assert tokenizer.decode([filled_ids[cut]]) == "A"
 
 
 def test_registry_codes_single_token_at_one_cut(engine):
     tokenizer = engine.tokenizer
-    text, marks = filled(STATE, [(QUESTION, LABELS)])
+    text, marks = engine.template(STATE, [(QUESTION, LABELS)])
     prefix = text[: marks[0]]
     base = tokenizer.encode(prefix)
     cuts = set()

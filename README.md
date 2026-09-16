@@ -48,7 +48,7 @@ uv sync
 uv run uvicorn system_one_lite.api:app --port 8010
 ```
 
-The first start loads `mlx-community/Qwen3.5-2B-MLX-4bit` and compiles the
+The first start loads `mlx-community/Qwen3-4B-Instruct-2507-4bit` and compiles the
 Metal kernels. Then send a request:
 
 ```bash
@@ -80,7 +80,7 @@ The response has one typed answer for each question:
 
 ```json
 {
-  "model": "mlx-community/Qwen3.5-2B-MLX-4bit",
+  "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
   "answers": {
     "team": {
       "type": "choice",

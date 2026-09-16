@@ -1,15 +1,13 @@
 # Introduction
 
-Most LLM features follow the same shape: send text, get text back, then parse
-that text and hope it fits the shape your code needs. System One Lite flips
-that. You send a *state* (any content) plus typed *questions*, and you get
-back typed answers with probabilities. Nothing is generated, so nothing needs
-parsing. Your code can branch on the answers, sort by them, and route with
-them.
+Most LLM features send text, get text back, then parse it. The code hopes the
+output has the expected shape. System One Lite reverses this. You send a
+*state* plus typed *questions*. It returns typed answers with probabilities.
+Nothing is generated or parsed. Your code can branch, sort, and route with the
+answers.
 
-This is a proof of concept. It exists to test one idea: that a plain
-open-weight LLM, used only as a scorer, can replace the generate-then-parse
-loop for classification and judgment calls.
+This proof of concept tests one idea. A plain open-weight LLM can score
+classification choices without generating text.
 
 ## One request, three parts
 
@@ -34,10 +32,8 @@ Every call has the same shape:
 
 - `state` is the content to judge. A string, or structured JSON. See
   [State](state.md).
-- `questions` maps IDs you pick to typed questions. There are three types:
-  **choice** (pick one option from your list), **score** (place the state on a
-  ladder of levels you define), and **noul** (how likely a
-  statement is to be true). See [Primitives](primitives/index.md).
+- `questions` maps your IDs to typed questions. There are three types:
+  **choice**, **score**, and **noul**. See [Primitives](primitives/index.md).
 
 The engine is fixed, so there is no `model` field to send; the response's
 `model` reports the engine that actually answered.
@@ -56,9 +52,8 @@ gives you two things plain text output does not:
 
 ## Small questions, combined in code
 
-The engine answers one focused question at a time. It is built for snap
-judgments — the kind a person makes in a few seconds with the right context in
-front of them — not for multi-step reasoning.
+The engine answers one focused question at a time. It handles quick judgments
+with clear context. It is not built for multi-step reasoning.
 
 When a decision depends on several factors, do not write one big question.
 Ask one question per factor and combine the answers in code, where you
@@ -67,7 +62,7 @@ inside a prompt is a rewrite.
 
 ## What is honest about this POC
 
-- The engine is a 2B model by default (`mlx-community/Qwen3.5-2B-MLX-4bit`).
+- The engine is a 4B model (`mlx-community/Qwen3-4B-Instruct-2507-4bit`).
   It is small, fast, and good enough to test the pattern. It is not a
   frontier model.
 - Probabilities come from one masked read of the option letters
