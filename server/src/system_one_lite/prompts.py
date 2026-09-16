@@ -80,6 +80,7 @@ def chat_filled(tokenizer, state, questions, codes=LETTERS):
         [{"role": "user", "content": user_prompt}],
         tokenize=False,
         add_generation_prompt=True,
+        enable_thinking=False,
     )
     text += '{"answer": "'
     mark = len(text)

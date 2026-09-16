@@ -38,10 +38,13 @@ def default_output(model_id):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--revision", help="required for a model without a built-in pin")
     ap.add_argument("--output")
     args = ap.parse_args()
 
-    model_path, revision = resolve_model_snapshot(args.model, tokenizer_only=True)
+    model_path, revision = resolve_model_snapshot(
+        args.model, tokenizer_only=True, revision=args.revision
+    )
     tokenizer = load_tokenizer(model_path)
     entries = answer_code_entries(tokenizer)
     output = Path(args.output) if args.output else default_output(args.model)

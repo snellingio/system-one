@@ -5,10 +5,14 @@ from functools import partial
 import pytest
 from mlx_lm.utils import load_tokenizer
 
+from system_one_lite import engine as engine_module
 from system_one_lite.engine import (
     DEFAULT_MODEL,
+    MODEL_REVISIONS,
+    QWEN3_1_7B_MODEL,
     Engine,
     TooManyOptions,
+    configured_model,
     load_code_registry,
     resolve_model_snapshot,
 )
@@ -51,3 +55,62 @@ def test_model_rejects_579_options(engine_contract):
     labels = [f"option {index}" for index in range(579)]
     with pytest.raises(TooManyOptions):
         engine_contract.prepare("state", [("pick one", labels)])
+
+
+def test_supported_models_have_pinned_registries():
+    for model_id, expected_revision in MODEL_REVISIONS.items():
+        model_path, revision = resolve_model_snapshot(model_id, tokenizer_only=True)
+        tokenizer = load_tokenizer(model_path)
+        _, codes, token_ids = load_code_registry(model_id, tokenizer, model_path, revision)
+
+        assert revision == expected_revision
+        assert codes[0] == "A"
+        assert len(codes) == len(set(token_ids))
+
+
+def test_small_model_uses_non_thinking_prompt():
+    model_path, _ = resolve_model_snapshot(QWEN3_1_7B_MODEL, tokenizer_only=True)
+    tokenizer = load_tokenizer(model_path)
+    text, _ = chat_filled(tokenizer, "state", [("pick one", ["yes", "no"])])
+
+    assert "<think>\n\n</think>" in text
+    assert text.endswith('{"answer": "A"}')
+
+
+def test_model_can_be_selected_by_environment(monkeypatch):
+    monkeypatch.setenv("SYSTEM_MODEL", QWEN3_1_7B_MODEL)
+
+    assert configured_model() == QWEN3_1_7B_MODEL
+    assert configured_model(DEFAULT_MODEL) == DEFAULT_MODEL
+
+
+def test_model_download_uses_exact_pin(tmp_path, monkeypatch):
+    revision = MODEL_REVISIONS[QWEN3_1_7B_MODEL]
+    snapshot = tmp_path / "snapshots" / revision
+    snapshot.mkdir(parents=True)
+    calls = []
+
+    def fake_download(model_id, **kwargs):
+        calls.append((model_id, kwargs))
+        return snapshot
+
+    monkeypatch.setattr(engine_module, "snapshot_download", fake_download)
+
+    path, resolved_revision = resolve_model_snapshot(QWEN3_1_7B_MODEL)
+
+    assert path == snapshot
+    assert resolved_revision == revision
+    assert calls == [(QWEN3_1_7B_MODEL, {"revision": revision, "allow_patterns": None})]
+
+
+def test_small_model_runs_masked_read():
+    engine = Engine(QWEN3_1_7B_MODEL)
+    probabilities, input_tokens, elapsed_ms = engine.evaluate(
+        "The API returns an integration error.",
+        [("Which team?", ["billing", "technical"])],
+    )
+
+    assert len(probabilities) == 1
+    assert abs(sum(probabilities[0]) - 1.0) < 1e-5
+    assert input_tokens > 0
+    assert elapsed_ms > 0

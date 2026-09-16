@@ -35,8 +35,9 @@ Every call has the same shape:
 - `questions` maps your IDs to typed questions. There are three types:
   **choice**, **score**, and **noul**. See [Primitives](primitives/index.md).
 
-The engine is fixed, so there is no `model` field to send; the response's
-`model` reports the engine that actually answered.
+The model is fixed for each server process, so there is no `model` field to
+send. Set `SYSTEM_MODEL` before startup to choose a supported model. The
+response's `model` field reports the engine that answered.
 
 ## Why probabilities matter
 
@@ -62,16 +63,15 @@ inside a prompt is a rewrite.
 
 ## What is honest about this POC
 
-- The engine is a 4B model (`mlx-community/Qwen3-4B-Instruct-2507-4bit`).
-  It is small, fast, and good enough to test the pattern. It is not a
-  frontier model.
+- The default is a 4B model
+  (`mlx-community/Qwen3-4B-Instruct-2507-4bit`). A smaller pinned 1.7B model is
+  also supported. Neither is a frontier model.
 - Probabilities come from one masked read of the option letters
   ([How it works](how-it-works.md)). They are not tuned against real
   outcomes yet, so treat them as ranked signal, not as calibrated odds.
 - `server/tools/evals.py` measures accuracy and option-order stability against
-  labeled datasets, which is the current evidence that the approach holds
-  up. Calibration work (temperature scaling, Brier checks) is planned but
-  not done.
+  labeled data. The public dataset is the next release step. Calibration work
+  is planned but not done.
 
 ## Next steps
 

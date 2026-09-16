@@ -8,6 +8,7 @@ One forward pass runs per question.
 
 import hashlib
 import json
+import os
 import string
 import time
 from functools import partial
@@ -20,7 +21,13 @@ from mlx_lm import load
 
 from .prompts import chat_filled
 
-DEFAULT_MODEL = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+QWEN3_1_7B_MODEL = "mlx-community/Qwen3-1.7B-4bit"
+QWEN3_4B_MODEL = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+MODEL_REVISIONS = {
+    QWEN3_1_7B_MODEL: "3b1b1768f8f8cf8351c712464f906e86c2b8269e",
+    QWEN3_4B_MODEL: "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+}
+DEFAULT_MODEL = QWEN3_4B_MODEL
 CODES_FILE = files("system_one_lite.data").joinpath("qwen3_4b_instruct_2507_4bit_answer_codes.json")
 TEMPERATURE = 0.7
 MAX_PROMPT_TOKENS = 32_768
@@ -49,6 +56,11 @@ class TooManyOptions(RequestContractError):
     pass
 
 
+def configured_model(model_id=None):
+    """Return an explicit model, the environment setting, or the default."""
+    return model_id or os.environ.get("SYSTEM_MODEL") or DEFAULT_MODEL
+
+
 def common_prefix_len(a, b):
     n = min(len(a), len(b))
     i = 0
@@ -57,15 +69,20 @@ def common_prefix_len(a, b):
     return i
 
 
-def resolve_model_snapshot(model_id, tokenizer_only=False):
+def resolve_model_snapshot(model_id, tokenizer_only=False, revision=None):
     """Return a local model snapshot and its Hub revision when available."""
     local = Path(model_id).expanduser()
     if local.exists():
         return local.resolve(), None
+    revision = revision or MODEL_REVISIONS.get(model_id)
+    if revision is None:
+        raise ValueError(
+            f"{model_id!r} has no pinned revision; pass one when generating its registry"
+        )
     patterns = list(TOKENIZER_FILES) if tokenizer_only else None
-    snapshot = Path(snapshot_download(model_id, allow_patterns=patterns))
-    revision = snapshot.name if snapshot.parent.name == "snapshots" else None
-    return snapshot, revision
+    snapshot = Path(snapshot_download(model_id, revision=revision, allow_patterns=patterns))
+    resolved_revision = snapshot.name if snapshot.parent.name == "snapshots" else None
+    return snapshot, resolved_revision
 
 
 def tokenizer_sha256(model_path):
@@ -200,9 +217,9 @@ def validate_code_contexts(tokenizer, codes, token_ids):
 
 
 class Engine:
-    def __init__(self, model_id=DEFAULT_MODEL):
-        self.model_id = model_id
-        self.model_path, self.model_revision = resolve_model_snapshot(model_id)
+    def __init__(self, model_id=None):
+        self.model_id = configured_model(model_id)
+        self.model_path, self.model_revision = resolve_model_snapshot(self.model_id)
         self.model, self.tokenizer = load(self.model_path)
         args = self.model.args
         text_config = getattr(args, "text_config", {})
@@ -212,7 +229,7 @@ class Engine:
             or MAX_PROMPT_TOKENS
         )
         self.registry_file, self.codes, self.code_token_ids = load_code_registry(
-            model_id, self.tokenizer, self.model_path, self.model_revision
+            self.model_id, self.tokenizer, self.model_path, self.model_revision
         )
         # every question is coded from the registry, not just A-Z
         self.template = partial(chat_filled, self.tokenizer, codes=self.codes)

@@ -27,6 +27,20 @@ uv run python -m tools.demo
 
 The demo tool sends one Choice question and prints a probability bar per option.
 
+The 4B Instruct model is the default. To use the smaller pinned model, start
+the server with:
+
+```bash
+SYSTEM_MODEL=mlx-community/Qwen3-1.7B-4bit \
+  uv run uvicorn system_one_lite.api:app --port 8010
+```
+
+Tools take the same model through `--model`:
+
+```bash
+uv run python -m tools.demo --model mlx-community/Qwen3-1.7B-4bit
+```
+
 To compare warmed engine latency for a request with one question and a request
 with three questions, run:
 
@@ -172,9 +186,9 @@ with SystemClient() as client:  # defaults to http://127.0.0.1:8010
         },
     )
 
-print(response.choices["topic"].choice)      # "deliveries"
-print(response.scores["frustration"].score)  # 0.894
-print(response.nouls["asks_for_refund"].noul)  # 0.651
+print(response.choices["topic"].choice)
+print(response.scores["frustration"].score)
+print(response.nouls["asks_for_refund"].noul)
 ```
 
 Set `SYSTEM_BASE_URL` to point it somewhere else. See `sdks/python/README.md`.
