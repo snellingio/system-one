@@ -174,9 +174,12 @@ def main():
     ap.add_argument("--datasets", default=str(DATASETS))
     args = ap.parse_args()
 
-    engine = Engine(args.model)
     root = Path(args.datasets)
     files = sorted(root.glob("*.jsonl"))
+    if not files:
+        ap.error(f"no JSONL datasets found in {root}")
+
+    engine = Engine(args.model)
     all_rows = []
     permute_n, permute_ok, tvs = 0, 0, []
 

@@ -1,11 +1,11 @@
 # Ocean games: decisions with real ground truth
 
-[datasets/ocean_playouts.jsonl](../datasets/ocean_playouts.jsonl) holds
-181 rows from three games: Connect Four, 2048, and Lights Out. The states
-come from playouts by real trained policies. PufferLib ships no
-checkpoints, but every demo on puffer.ai/ocean.html embeds its policy in
-the page. `server/tools/ocean/harvest.py` pulls those weights, replays the
-games, and writes rows in the standard envelope.
+The local `datasets/ocean_playouts.jsonl` file holds 181 rows from three games:
+Connect Four, 2048, and Lights Out. The dataset is not tracked yet. The states
+come from playouts by real trained policies. PufferLib ships no checkpoints,
+but every demo on puffer.ai/ocean.html embeds its policy in the page.
+`server/tools/ocean/harvest.py` pulls those weights, replays the games, and
+writes rows in the standard envelope.
 
 The point for this product: most question sets can only be graded
 against a teacher's opinion. These can be graded against the game.
@@ -20,11 +20,10 @@ be right or wrong about.
 | 2048 | 73 | Which direction should the player slide? | The specialist policy's pick; merge availability is exact |
 | Lights Out | 60 | Which cell should the player press? | Exact shortest solution over GF(2) |
 
-Every row also carries `soft_targets`, ready for the training-set tool: the
-Choice targets are the trained policy's own action distribution, and the
-Noul and Score targets are one-hots of the gold. Each row's `ocean`
-block names the label source per question, the policy's pick, its value
-estimate, and the weights URL.
+Every row also carries `soft_targets` for the training-set tool. Choice targets
+use the trained policy's action distribution. Noul and Score targets use
+one-hots of the gold. Each row's `ocean` block names the label source, policy
+pick, value estimate, and weights URL.
 
 ## Example row
 
@@ -51,8 +50,8 @@ Questions and gold (policy distribution in parentheses):
 - **Choice** "In which column should X drop its piece?" — gold `col_5`.
   The solver finds a forced win and column 5 wins on the spot
   (policy: col_5 at 1.00).
-- **Noul** "Does X have a drop this turn that immediately completes four
-  in a row?" — gold `true`.
+- **Noul** "Does X have a drop this turn that completes a four-in-a-row?" —
+  gold `true`.
 - **Noul** "Does O have a drop on its next turn that would complete four
   in a row?" — gold `true`. O just built its own threat; X must win now,
   not later.
@@ -64,12 +63,10 @@ answers that are facts, not opinions.
 
 ## Baseline
 
-The untrained base model scores 189/591 (32%) on these rows via
-the eval tool: Choice 12/181, Noul 130/229, Score 47/181, with option-order
-permutation flipping the winner on 7 of 8 probes. That is the "before"
-number. Fine-tuning on this file (it already carries `soft_targets`) is
-the obvious next step, and the game-truth golds make calibration metrics
-mean something afterwards.
+The untrained base model scores 189/591 (32%) on these rows. The split is
+Choice 12/181, Noul 130/229, and Score 47/181. Option rotation flips the winner
+on 7 of 8 probes. That is the "before" number. The file already has
+`soft_targets` for future training and calibration work.
 
 ## Regenerate
 
@@ -97,7 +94,7 @@ the playouts.
   horizon (`ocean.solver_depth`, 6 to 12 plies here). Deeper forces may
   exist; the horizon keeps the label honest and cheap.
 - The Connect 4 port keeps a quirk of the shipped PufferLib env: its
-  draw rule almost never fires, so drawn games are practically
+  draw rule almost never fires, so drawn games are almost
   impossible in these playouts. The policy was trained with that rule,
   so the harvest keeps it.
 - Playouts act by argmax; the live web demo samples its softmax. The

@@ -1,46 +1,73 @@
 # System One Lite
 
-Typed decisions from a local language model, without text generation.
+## Stop asking language models to write. Start making them decide.
 
-System One Lite turns unstructured input into answers your code can use. Send
-one state plus one or more typed questions. The server returns a probability
-distribution for each answer. It does not generate or parse free-form text.
+Language models are brilliant at producing text. Software does not want text.
+It wants a route, a score, a yes or no, and an honest signal when the answer is
+unclear.
 
-This is a proof of concept for routing, scoring, gating, and other small
-decisions that sit inside normal software. It runs a stock open-weight model
-locally with MLX.
+So why are we still asking models to write tiny essays? We parse those essays
+back into data, validate the data, retry failures, and hope nothing goes off the
+rails.
 
-## Why this exists
+**System One Lite deletes the essay.**
 
-Most LLM features follow the same loop:
+Send one unstructured state plus up to 64 typed questions. A local model scores
+only the answers you allow and returns a probability distribution for every
+question.
 
-1. Ask for text.
-2. Parse the text into a schema.
-3. Retry when the text does not fit.
+**Unstructured state in. Typed probabilities out. Zero generated tokens.**
 
-System One Lite replaces that loop with a masked read. Each question defines
-the only valid answers. The engine reads the model's next-token scores for
-those answers, masks everything else, and applies softmax. The result is typed
-by construction.
+No free-form response. No JSON repair loop. No invented option that your code
+has never heard of.
 
-This gives you:
+This is an independent proof of concept for the interface behind
+[System One Models](https://typesafe.ai/blog/introducing-system-one-models-and-jev).
+It is not a new foundation model. It runs a stock open-weight model locally
+with MLX and asks a much more interesting question:
 
-- no malformed output;
-- no generated tokens;
-- a full probability distribution, not only a winning label;
-- independent questions whose answers cannot affect each other; and
-- local inference with a fixed model.
+> How much simpler does AI software become when the model is only allowed to
+> decide?
 
-## Requirements
+## The old stack is absurd
 
-- An Apple silicon Mac. The current server uses MLX.
-- Python 3.12 or newer.
-- [uv](https://docs.astral.sh/uv/).
-- Internet access on the first run to download the default model.
+| | A normal LLM feature | System One Lite |
+| --- | --- | --- |
+| Input | Unstructured text | Unstructured text or JSON |
+| Output | A generated string | A typed answer over declared options |
+| Uncertainty | A guess written in prose | The full probability distribution |
+| Validation | Parse, validate, retry | Constrained by construction |
+| Output tokens | One token at a time | **Zero** |
+| Failure mode | Malformed data or invented values | A valid answer that may still be wrong |
+| Deployment | Usually a hosted model | A fixed local model on Apple silicon |
 
-## Quickstart
+The final row matters. System One Lite does not make a small model infallible.
+It makes the limit between the model and your code brutally clear. The
+model can choose the wrong declared answer. It cannot create a new one.
 
-Start the server:
+That is the difference between asking AI to behave like an API and giving it
+an interface it cannot break.
+
+## Three primitives. A ridiculous number of decisions.
+
+| Type | Ask it to | Get back |
+| --- | --- | --- |
+| [Choice](docs/primitives/choice.md) | Pick from a closed set | Winner, probabilities, and confidence |
+| [Score](docs/primitives/score.md) | Judge a position on an ordered scale | Weighted score, level probabilities, and confidence |
+| [Noul](docs/primitives/noul.md) | Make a yes or no judgment | Probability of yes |
+
+Route support tickets. Rank leads. Gate a workflow. Score risk. Flag content.
+Decide whether a human needs to look. Combine several small judgments into a
+larger rule that stays in ordinary code.
+
+Each question is independent. One answer cannot leak into the next. Your code,
+not a hidden chain of thought, decides what happens after the probabilities
+arrive.
+
+## Watch it decide
+
+System One Lite needs an Apple silicon Mac, Python 3.12 or newer, and
+[`uv`](https://docs.astral.sh/uv/). Start the server:
 
 ```bash
 cd server
@@ -48,8 +75,9 @@ uv sync
 uv run uvicorn system_one_lite.api:app --port 8010
 ```
 
-The first start loads `mlx-community/Qwen3-4B-Instruct-2507-4bit` and compiles the
-Metal kernels. Then send a request:
+The first launch downloads
+`mlx-community/Qwen3-4B-Instruct-2507-4bit` and compiles its Metal kernels.
+Then give it a state and a decision:
 
 ```bash
 curl -s http://127.0.0.1:8010/evaluate \
@@ -76,7 +104,7 @@ curl -s http://127.0.0.1:8010/evaluate \
 EOF
 ```
 
-The response has one typed answer for each question:
+One request comes back ready for code:
 
 ```json
 {
@@ -104,41 +132,66 @@ The response has one typed answer for each question:
 }
 ```
 
-The numbers above show the response shape. Exact values depend on the model
-and input.
+The numbers show the response shape. Exact values depend on the input and
+model. The shape does not.
 
-For a longer example with all three question types, see the
+For a longer example with all three question types, open the
 [quickstart](docs/quickstart.md).
 
-## Question types
+## Pick the model
 
-| Type | Use it for | Returned value |
-| --- | --- | --- |
-| [Choice](docs/primitives/choice.md) | One option from a closed set | Winner, probabilities, and confidence |
-| [Score](docs/primitives/score.md) | A position on an ordered scale | Weighted score, level probabilities, and confidence |
-| [Noul](docs/primitives/noul.md) | A yes or no judgment | Probability of yes |
+The default is the 4B Instruct model above. Use the smaller Qwen 3 1.7B model
+with one environment setting:
 
-You can send up to 64 questions in one request. Each question gets its own
-full prompt with the shared state. The engine runs one model pass per question
-and returns every answer under the ID you chose.
+```bash
+SYSTEM_MODEL=mlx-community/Qwen3-1.7B-4bit \
+  uv run uvicorn system_one_lite.api:app --port 8010
+```
 
-## How it works
+Both model repositories are pinned to exact commits. Each model has its own
+checked-in answer-code registry. The 1.7B prompt also turns thinking off, so
+both models use the same answer slot and API. Change models only after you run
+the same accuracy and option-order checks on both.
 
-For each question, the server:
+## The trick is almost offensively simple
+
+For every question, the server:
 
 1. Writes the state, question, and allowed answers into a prompt.
-2. Gives each answer a token code such as `A`, `B`, or `C`.
-3. Runs the model up to the answer slot without decoding text.
-4. Keeps only the logits for valid answer codes.
+2. Assigns each answer a token code such as `A`, `B`, or `C`.
+3. Runs the model up to the answer slot without decoding any text.
+4. Throws away every logit except the valid answer codes.
 5. Applies softmax and maps the probabilities back to your labels.
 
-Choice returns the most likely label and the full distribution. Score returns
-the probability-weighted level. Noul returns the probability of `yes`.
+The model never gets the chance to ramble. It reaches the exact point where
+an answer must appear, and System One Lite reads the scores directly.
 
-Read [How it works](docs/how-it-works.md) for token alignment, limits, and the
-reason each question uses an independent prompt.
+Choice returns the winning label and the full distribution. Score returns the
+probability-weighted level. Noul returns the probability of `yes`. Every extra
+question gets its own full prompt, so questions cannot affect one another.
 
-## Use an SDK
+Read [How it works](docs/how-it-works.md) for token alignment, option limits,
+and the reason this safe path uses one model pass per question.
+
+## Extraordinary claims, meet a local eval
+
+There is no benchmark confetti here. The repository has an eval runner so you
+can measure the idea on the machine that will run it:
+
+```bash
+cd server
+uv run python -m tools.evals --limit 20
+```
+
+The report shows accuracy by question type. It also rotates Choice options and
+checks whether changing their order changes the winner. The public dataset is
+the next release step and is not in Git yet. For now, place local JSONL files
+under `datasets/`, or pass another directory with `--datasets`.
+
+Better yet, add examples from your own traffic. A decision system earns trust
+on the states it will actually see, not on a launch graphic.
+
+## Use it from code
 
 The repository includes two local SDKs:
 
@@ -150,21 +203,30 @@ The repository includes two local SDKs:
 Both clients use `http://127.0.0.1:8010` by default. Set `SYSTEM_BASE_URL` to
 change it.
 
-## Measure it
+## The part most launch posts bury
 
-Run the labeled eval sets against the local model:
+System One Lite is an experiment, not a production decision service.
 
-```bash
-cd server
-uv run python -m tools.evals --limit 20
-```
+- The default 4B model is small. It will not match a frontier model on hard
+  judgments.
+- The returned probabilities are model scores. They are **not calibrated odds
+  of being correct**.
+- Synthetic eval data does not stand in for real production traffic.
+- Every question repeats the state and runs separately. Cost grows with the
+  number and length of questions.
+- The server handles one inference request at a time and returns `503` while
+  the engine is busy.
+- The current server requires Apple silicon because it uses MLX.
 
-The eval runner reports accuracy by question type and checks whether rotating
-Choice options changes the winner. The repository also includes generated
-examples, public benchmark samples, and game states with exact or
-policy-derived labels under [`datasets/`](datasets/README.md).
+Use confidence to route uncertain cases. Set thresholds from labeled data that
+matches your traffic. Read [Confidence](docs/confidence.md) before you let a
+score trigger anything expensive, sensitive, or hard to undo.
 
-Run the local checks:
+The honest pitch is still exciting. This tiny project turns a normal local LLM
+into a typed decision engine. It needs no fine-tuning, text generation, or
+parser. That is enough to build a surprising amount of software.
+
+## Run every check
 
 ```bash
 cd server
@@ -176,33 +238,19 @@ cd ../sdks/javascript
 npm run typecheck
 ```
 
-## Limits
-
-System One Lite is an experiment, not a production decision service.
-
-- The default model is small. It will not match a frontier model on hard
-  judgments.
-- Returned probabilities are model scores. They are not calibrated odds of
-  being correct.
-- Synthetic eval data does not cover real production traffic.
-- Each question repeats the state and runs separately, so cost grows with the
-  number and length of questions.
-- The server accepts one inference request at a time. It returns `503` while
-  the engine is busy.
-
-Use confidence to route uncertain cases, then set thresholds from labeled data
-that matches your own traffic. See [Confidence](docs/confidence.md) for the
-formula and its limits.
-
 ## Project map
 
-| Path | Purpose |
+| Path | What is inside |
 | --- | --- |
 | [`server/`](server/) | FastAPI service, MLX engine, evals, and tests |
 | [`sdks/python/`](sdks/python/) | Python client |
 | [`sdks/javascript/`](sdks/javascript/) | TypeScript client |
-| [`datasets/`](datasets/) | Labeled examples and benchmark samples |
 | [`docs/`](docs/) | Guides and API reference |
 
-Start with the [introduction](docs/introduction.md), then read the
-[API reference](docs/api.md) for the full request shape, limits, and errors.
+Start with the [introduction](docs/introduction.md). Then read the
+[API reference](docs/api.md) for the complete request shape, limits, and error
+responses.
+
+## License
+
+[MIT](LICENSE). The supported MLX model repositories use Apache 2.0.
