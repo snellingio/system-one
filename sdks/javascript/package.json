@@ -2,6 +2,7 @@
   "name": "system-sdk",
   "version": "0.6.0",
   "description": "Local JavaScript SDK clone for the System One Lite evaluate endpoint",
+  "license": "MIT",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

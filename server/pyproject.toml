@@ -6,6 +6,7 @@ build-backend = "uv_build"
 name = "system-one-lite"
 version = "0.1.0"
 description = "Schema-constrained decisions using a local MLX language model"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",

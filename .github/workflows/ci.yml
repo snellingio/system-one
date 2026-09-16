@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: macos-14
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: server
+    env:
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: models-${{ hashFiles('server/src/system_one_lite/data/*_answer_codes.json') }}
+      - run: uv sync --frozen --all-groups
+      - run: uv run ruff check src tools tests
+      - run: uv run ruff format --check src tools tests
+      - run: uv run pytest
+
+  sdks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sdks/javascript/package-lock.json
+      - name: Test Python SDK
+        working-directory: sdks/python
+        run: uv run --with pytest pytest -q
+      - name: Install JavaScript SDK dependencies
+        working-directory: sdks/javascript
+        run: npm ci
+      - name: Type-check JavaScript SDK
+        working-directory: sdks/javascript
+        run: npm run typecheck
