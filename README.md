@@ -185,18 +185,18 @@ and the reason this safe path uses one model pass per question.
 
 ## Extraordinary claims, meet a local eval
 
-There is no benchmark confetti here. The repository has an eval runner so you
-can measure the idea on the machine that will run it:
+There is no benchmark confetti here. The repository has an eval runner for
+JSONL files that use the documented dataset envelope:
 
 ```bash
 cd server
-uv run python -m tools.evals --limit 20
+uv run python -m tools.evals --datasets /path/to/jsonl-directory --limit 20
 ```
 
 The report shows accuracy by question type. It also rotates Choice options and
-checks whether changing their order changes the winner. The repository includes
-generated examples, public benchmark samples, and game states with exact or
-policy-derived labels under [`datasets/`](datasets/README.md).
+checks whether changing their order changes the winner. The public dataset is
+the next release step and is not in Git yet. Local files under `datasets/` are
+ignored, so they cannot be published by accident.
 
 Better yet, add examples from your own traffic. A decision system earns trust
 on the states it will actually see, not on a launch graphic.
@@ -244,8 +244,13 @@ uv run ruff check src tools tests
 uv run ruff format --check src tools tests
 uv run pytest
 
-cd ../sdks/javascript
+cd ../sdks/python
+uv run --with pytest pytest -q
+
+cd ../javascript
+npm ci
 npm run typecheck
+npm test
 ```
 
 ## Project map

@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   server:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 30
     defaults:
       run:
@@ -52,3 +52,9 @@ jobs:
       - name: Type-check JavaScript SDK
         working-directory: sdks/javascript
         run: npm run typecheck
+      - name: Test JavaScript SDK package
+        working-directory: sdks/javascript
+        run: npm test
+      - name: Check JavaScript SDK build output
+        working-directory: sdks/javascript
+        run: git diff --exit-code -- dist
