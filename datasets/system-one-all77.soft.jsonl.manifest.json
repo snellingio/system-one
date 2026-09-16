@@ -1,0 +1,1 @@
+{"input_sha256": "3b56ee034fe150a76e5246b884a389f9c2193d2088be7e36776fc131429ccb43", "labeling_version": 2, "model": "deepseek/deepseek-v4.1-flash", "permutations": 4, "provider": "DeepSeek", "record_count": 3981, "replace_existing": false, "truncated_tail_mass": 0.02, "version": 1}

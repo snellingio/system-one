@@ -3,6 +3,8 @@
 A tiny project that turns a normal local LLM into a typed decision engine. It
 needs no fine-tuning, text generation, or parser. [Read the docs](docs/index.md).
 
+![How System One Lite works](docs/assets/how-system-one-lite-works-v3.png)
+
 ## Stop asking language models to write. Start making them decide.
 
 Language models are brilliant at producing text. Software does not want text.
