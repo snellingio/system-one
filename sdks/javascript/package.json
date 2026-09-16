@@ -1,0 +1,19 @@
+{
+  "name": "system-sdk",
+  "version": "0.6.0",
+  "description": "Local JavaScript SDK clone for the System One Lite evaluate endpoint",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2"
+  }
+}
