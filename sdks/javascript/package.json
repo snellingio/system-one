@@ -4,10 +4,19 @@
   "description": "Local JavaScript SDK clone for the System One Lite evaluate endpoint",
   "license": "MIT",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
+    "test": "npm run build && node --test",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

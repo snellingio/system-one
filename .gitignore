@@ -25,6 +25,8 @@ htmlcov/
 venv/
 *.egg-info/
 dist/
+!sdks/javascript/dist/
+!sdks/javascript/dist/**
 build/
 
 # JavaScript

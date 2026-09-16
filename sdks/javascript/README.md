@@ -1,8 +1,14 @@
 # JavaScript SDK (local clone)
 
-A local clone of the `system-sdk` API, pointed at the System One
-Lite server (`server/src/system_one_lite/api.py`). Source is TypeScript; Node 22.18 or newer
-runs it directly without a flag or build step. Calls time out after 30 seconds.
+A local clone of the `system-sdk` API, pointed at the System One Lite server
+(`server/src/system_one_lite/api.py`). It builds TypeScript to JavaScript for
+Node 22.18 or newer. Calls time out after 30 seconds.
+
+Install it from a System One Lite checkout:
+
+```bash
+npm install /path/to/system-one/sdks/javascript
+```
 
 ## Use
 
@@ -41,5 +47,5 @@ adds `score` and `legend`; Noul is a single `noul` number.
 - `src/client.ts` — `SystemClient` with `systemOne`.
 - `examples/quickstart.ts` — the docs example plus all three question types.
 
-Install development dependencies with `npm install`, then type-check with
-`npm run typecheck`.
+Install development dependencies with `npm install`. Run `npm run typecheck`
+and `npm test` before publishing or using a changed package.
