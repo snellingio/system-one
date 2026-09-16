@@ -1,5 +1,7 @@
 # System One Lite
 
+a tiny project turns a normal local LLM into a typed decision engine. It needs no fine-tuning, text generation, or parser. That is enough to build a surprising amount of software. [docs](docs/index.md)
+
 ## Stop asking language models to write. Start making them decide.
 
 Language models are brilliant at producing text. Software does not want text.
@@ -25,9 +27,6 @@ This is an independent proof of concept for the interface behind
 [System One Models](https://typesafe.ai/blog/introducing-system-one-models-and-jev).
 It is not a new foundation model. It runs a stock open-weight model locally
 with MLX and asks a much more interesting question:
-
-> How much simpler does AI software become when the model is only allowed to
-> decide?
 
 ## The old stack is absurd
 
@@ -231,10 +230,6 @@ System One Lite is an experiment, not a production decision service.
 Use confidence to route uncertain cases. Set thresholds from labeled data that
 matches your traffic. Read [Confidence](docs/confidence.md) before you let a
 score trigger anything expensive, sensitive, or hard to undo.
-
-The honest pitch is still exciting. This tiny project turns a normal local LLM
-into a typed decision engine. It needs no fine-tuning, text generation, or
-parser. That is enough to build a surprising amount of software.
 
 ## Run every check
 
