@@ -24,11 +24,11 @@ question.
 No free-form response. No JSON repair loop. No invented option that your code
 has never heard of.
 
-This is an independent proof of concept for the interface behind
-[System One Models](https://typesafe.ai/blog/introducing-system-one-models-and-jev).
-It is not a new foundation model. It runs a stock open-weight model locally
-with MLX and tests how much simpler AI software becomes when the model is only
-allowed to decide.
+This is an independent proof of concept.
+
+It uses the System One Models interface.
+It is not a new foundation model. It runs a stock open-weight model with MLX.
+The project tests simpler AI software where the model can only decide.
 
 ## The old stack is absurd
 
