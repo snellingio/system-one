@@ -13,8 +13,9 @@ a typed answer for every question, keyed by the IDs you chose.
 | `state` | `string \| object \| array` | yes | The content to judge. See [State](state.md). |
 | `questions` | `map<string, Question>` | yes | At least one entry. Each key is an ID you pick; the answer comes back under it. The engine never sees your IDs. |
 
-There is no `model` field. The engine is fixed; the response's `model` field
-reports the engine that actually answered.
+There is no `model` field. The engine is fixed for the life of the server
+process. Set `SYSTEM_ONE_MODEL=default` or `SYSTEM_ONE_MODEL=larger` before
+startup. The response's `model` field reports the exact model that answered.
 
 IDs only route answers back to your code. Two requests can use the same option
 names with different IDs, and renaming an ID never changes the probabilities.
@@ -96,7 +97,7 @@ How likely the statement is to be true.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `model` | `string` | The engine's own model ID: `mlx-community/Qwen3-4B-Instruct-2507-4bit`. |
+| `model` | `string` | The engine's own model ID. The default is `mlx-community/Qwen3-1.7B-4bit`. |
 | `answers` | `map<string, Answer>` | One answer per question, keyed by your IDs, in request order. |
 | `usage.input_tokens` | `integer` | Total tokens evaluated across the independent question prompts. |
 | `usage.output_tokens` | `integer` | Always 0. Nothing is generated. |

@@ -91,11 +91,11 @@ EOF
 ## 3. Read the response
 
 This is a rounded response from a local run of that request (a warm
-`Qwen3-4B-Instruct-2507-4bit` engine):
+`Qwen3-1.7B-4bit` engine):
 
 ```json
 {
-  "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+  "model": "mlx-community/Qwen3-1.7B-4bit",
   "answers": {
     "topic": {
       "type": "choice",
@@ -123,7 +123,7 @@ This is a rounded response from a local run of that request (a warm
       "noul": 0.0
     }
   },
-  "usage": { "input_tokens": 367, "output_tokens": 0 }
+  "usage": { "input_tokens": 379, "output_tokens": 0 }
 }
 ```
 

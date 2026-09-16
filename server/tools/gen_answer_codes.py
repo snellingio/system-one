@@ -19,12 +19,14 @@ from mlx_lm.utils import load_tokenizer
 from system_one_lite.engine import (
     DEFAULT_MODEL,
     answer_code_entries,
+    resolve_model_id,
     resolve_model_snapshot,
     tokenizer_sha256,
 )
 
 
 def default_output(model_id):
+    model_id = resolve_model_id(model_id)
     data_dir = files("system_one_lite.data")
     for item in data_dir.iterdir():
         if not item.name.endswith("_answer_codes.json"):
@@ -41,15 +43,16 @@ def main():
     ap.add_argument("--output")
     args = ap.parse_args()
 
-    model_path, revision = resolve_model_snapshot(args.model, tokenizer_only=True)
+    model_id = resolve_model_id(args.model)
+    model_path, revision = resolve_model_snapshot(model_id, tokenizer_only=True)
     tokenizer = load_tokenizer(model_path)
     entries = answer_code_entries(tokenizer)
-    output = Path(args.output) if args.output else default_output(args.model)
+    output = Path(args.output) if args.output else default_output(model_id)
     if not output.is_absolute():
         output = Path.cwd() / output
 
     out = {
-        "model": args.model,
+        "model": model_id,
         "model_revision": revision,
         "tokenizer_sha256": tokenizer_sha256(model_path),
         "slot_context": "codes appended after the assistant JSON answer prefix",

@@ -4,6 +4,7 @@ field), through the FastAPI TestClient."""
 import pytest
 from fastapi.testclient import TestClient
 
+from system_one_lite import api as api_module
 from system_one_lite.api import app, create_app
 from system_one_lite.engine import RequestContractError
 from system_one_lite.schemas import (
@@ -37,6 +38,15 @@ def evaluate(questions):
 
 def test_module_import_does_not_load_engine():
     assert app.state.engine is None
+
+
+def test_configured_engine_uses_selected_profile(monkeypatch):
+    selected = []
+    monkeypatch.setenv("SYSTEM_ONE_MODEL", "larger")
+    monkeypatch.setattr(api_module, "Engine", selected.append)
+
+    assert api_module.configured_engine() is None
+    assert selected == ["larger"]
 
 
 def test_quickstart_mixed_three_questions():

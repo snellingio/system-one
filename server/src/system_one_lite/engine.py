@@ -20,8 +20,10 @@ from mlx_lm import load
 
 from .prompts import chat_filled
 
-DEFAULT_MODEL = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
-CODES_FILE = files("system_one_lite.data").joinpath("qwen3_4b_instruct_2507_4bit_answer_codes.json")
+DEFAULT_MODEL = "mlx-community/Qwen3-1.7B-4bit"
+LARGER_MODEL = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+MODEL_PROFILES = {"default": DEFAULT_MODEL, "larger": LARGER_MODEL}
+CODES_FILE = files("system_one_lite.data").joinpath("qwen3_1_7b_4bit_answer_codes.json")
 TEMPERATURE = 0.7
 MAX_PROMPT_TOKENS = 32_768
 MAX_TOTAL_INPUT_TOKENS = 131_072
@@ -47,6 +49,11 @@ class RequestContractError(ValueError):
 
 class TooManyOptions(RequestContractError):
     pass
+
+
+def resolve_model_id(model_id):
+    """Expand a built-in profile name, or keep an exact model ID or path."""
+    return MODEL_PROFILES.get(model_id, model_id)
 
 
 def common_prefix_len(a, b):
@@ -201,6 +208,7 @@ def validate_code_contexts(tokenizer, codes, token_ids):
 
 class Engine:
     def __init__(self, model_id=DEFAULT_MODEL):
+        model_id = resolve_model_id(model_id)
         self.model_id = model_id
         self.model_path, self.model_revision = resolve_model_snapshot(model_id)
         self.model, self.tokenizer = load(self.model_path)

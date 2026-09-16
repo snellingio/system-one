@@ -35,8 +35,10 @@ Every call has the same shape:
 - `questions` maps your IDs to typed questions. There are three types:
   **choice**, **score**, and **noul**. See [Primitives](primitives/index.md).
 
-The engine is fixed, so there is no `model` field to send; the response's
-`model` reports the engine that actually answered.
+The engine is fixed for the life of the server process, so there is no `model`
+field to send. Set `SYSTEM_ONE_MODEL=default` or `SYSTEM_ONE_MODEL=larger`
+before startup. The response's `model` field reports the exact model that
+answered.
 
 ## Why probabilities matter
 
@@ -62,9 +64,9 @@ inside a prompt is a rewrite.
 
 ## What is honest about this POC
 
-- The engine is a 4B model (`mlx-community/Qwen3-4B-Instruct-2507-4bit`).
-  It is small, fast, and good enough to test the pattern. It is not a
-  frontier model.
+- The default engine is a 1.7B model (`mlx-community/Qwen3-1.7B-4bit`).
+  The larger option is `mlx-community/Qwen3-4B-Instruct-2507-4bit`. Both are
+  small enough to run locally. Neither is a frontier model.
 - Probabilities come from one masked read of the option letters
   ([How it works](how-it-works.md)). They are not tuned against real
   outcomes yet, so treat them as ranked signal, not as calibrated odds.

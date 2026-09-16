@@ -26,10 +26,11 @@ Please show your choice in the answer field with only the choice letter,
 e.g., "answer": "C".
 ```
 
-The engine wraps this question in Qwen's chat template. This model only uses
-non-thinking mode. The assistant response starts with `{"answer": "`. The
-masked read scores the one answer-code token that follows that prefix. A
-complete filler such as `{"answer": "A"}` keeps the template easy to inspect.
+The engine wraps this question in Qwen's chat template with thinking disabled.
+The template closes an empty thinking block when the model requires one. The
+scored answer starts with `{"answer": "`. The masked read scores the one
+answer-code token that follows that prefix. A complete filler such as
+`{"answer": "A"}` keeps the template easy to inspect.
 
 `as_text` leaves strings unchanged and turns objects or arrays into indented
 JSON. Each question becomes a `Question k:` block. Option codes start at `A`,
@@ -115,10 +116,15 @@ Compare accuracy and order stability on labeled data before and after.
 
 ## Model contract
 
-The shipped engine uses `mlx-community/Qwen3-4B-Instruct-2507-4bit`. Its
-checked-in registry pins the exact tokenizer revision and its 578 valid
-answer codes.
-A model change needs a new registry and a full accuracy and stability run.
+The default engine uses `mlx-community/Qwen3-1.7B-4bit`. The larger option is
+`mlx-community/Qwen3-4B-Instruct-2507-4bit`. Each checked-in registry pins the
+exact tokenizer revision and its 578 valid answer codes. Any other model needs
+a new registry and a full accuracy and stability run.
+
+`Engine`, the demo, the benchmark, and the eval tool accept `default` or
+`larger` as the model name. Download either profile before a run with
+`python -m tools.download_model default` or
+`python -m tools.download_model larger`.
 
 The cache experiment tool tests shared-prefix KV reuse. It is separate from the
 server and exits with an error if its probabilities differ from the safe full

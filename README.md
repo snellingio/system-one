@@ -48,7 +48,7 @@ uv sync
 uv run uvicorn system_one_lite.api:app --port 8010
 ```
 
-The first start loads `mlx-community/Qwen3-4B-Instruct-2507-4bit` and compiles the
+The first start loads `mlx-community/Qwen3-1.7B-4bit` and compiles the
 Metal kernels. Then send a request:
 
 ```bash
@@ -80,7 +80,7 @@ The response has one typed answer for each question:
 
 ```json
 {
-  "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+  "model": "mlx-community/Qwen3-1.7B-4bit",
   "answers": {
     "team": {
       "type": "choice",
@@ -157,6 +157,26 @@ Run the labeled eval sets against the local model:
 ```bash
 cd server
 uv run python -m tools.evals --limit 20
+```
+
+The 1.7B model is the `default` profile. The 4B Instruct model is the
+`larger` profile. Download either model before a run with:
+
+```bash
+uv run python -m tools.download_model default
+uv run python -m tools.download_model larger
+```
+
+The demo, benchmark, and eval tools accept either profile. For example:
+
+```bash
+uv run python -m tools.evals --model larger --limit 20
+```
+
+The server uses `default` unless `SYSTEM_ONE_MODEL` selects another profile:
+
+```bash
+SYSTEM_ONE_MODEL=larger uv run uvicorn system_one_lite.api:app --port 8010
 ```
 
 The eval runner reports accuracy by question type and checks whether rotating

@@ -14,7 +14,11 @@ from system_one_lite.prompts import (
 class FakeTokenizer:
     def apply_chat_template(self, messages, **kwargs):
         assert len(messages) == 1 and messages[0]["role"] == "user"
-        assert kwargs == {"tokenize": False, "add_generation_prompt": True}
+        assert kwargs == {
+            "tokenize": False,
+            "add_generation_prompt": True,
+            "enable_thinking": False,
+        }
         return f"<user>{messages[0]['content']}<assistant>"
 
 
