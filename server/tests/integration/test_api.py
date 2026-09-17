@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from system_one_lite import api as api_module
 from system_one_lite.api import app, create_app
-from system_one_lite.engine import RequestContractError
+from system_one_lite.errors import RequestContractError
 from system_one_lite.schemas import (
     MAX_QUESTIONS,
     MAX_REQUEST_BYTES,
@@ -42,11 +42,28 @@ def test_module_import_does_not_load_engine():
 
 def test_configured_engine_uses_selected_profile(monkeypatch):
     selected = []
+    monkeypatch.setenv("SYSTEM_ONE_BACKEND", "mlx")
     monkeypatch.setenv("SYSTEM_ONE_MODEL", "larger")
-    monkeypatch.setattr(api_module, "Engine", selected.append)
+    monkeypatch.setattr(api_module, "build_mlx_engine", selected.append)
 
     assert api_module.configured_engine() is None
     assert selected == ["larger"]
+
+
+def test_configured_engine_uses_nli_backend(monkeypatch):
+    selected = []
+    monkeypatch.setenv("SYSTEM_ONE_BACKEND", "nli")
+    monkeypatch.setenv("SYSTEM_ONE_NLI_MODEL", "example/nli")
+    monkeypatch.setattr(api_module, "build_nli_engine", selected.append)
+
+    assert api_module.configured_engine() is None
+    assert selected == ["example/nli"]
+
+
+def test_configured_engine_rejects_unknown_backend(monkeypatch):
+    monkeypatch.setenv("SYSTEM_ONE_BACKEND", "mystery")
+    with pytest.raises(ValueError, match="unknown SYSTEM_ONE_BACKEND"):
+        api_module.configured_engine()
 
 
 def test_quickstart_mixed_three_questions():

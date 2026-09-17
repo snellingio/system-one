@@ -79,6 +79,36 @@ uv run uvicorn system_one_lite.api:app --port 8010
 The default profile uses `mlx-community/Qwen3-1.7B-4bit`. On first startup, the
 server downloads the pinned model revision and compiles the Metal kernels.
 
+### Try the OpenJEV backend
+
+The experimental NLI backend keeps the same HTTP contract. It turns each
+allowed answer into a premise-hypothesis pair, batches those pairs, and maps
+their entailment probabilities back to Choice, Score, and Noul responses.
+
+```bash
+cd server
+uv sync --group nli
+SYSTEM_ONE_BACKEND=nli uv run uvicorn system_one_lite.api:app --port 8010
+```
+
+The first run downloads `AlexWortega/openjev` and loads its
+`qwen3.5-4b-nli` checkpoint through Transformers. Override its settings with
+`SYSTEM_ONE_NLI_MODEL`, `SYSTEM_ONE_NLI_SUBFOLDER`,
+`SYSTEM_ONE_NLI_REVISION`, `SYSTEM_ONE_NLI_DEVICE`, `SYSTEM_ONE_NLI_BATCH_SIZE`,
+`SYSTEM_ONE_NLI_MAX_LENGTH`, `SYSTEM_ONE_NLI_TEMPERATURE`, and
+`SYSTEM_ONE_NLI_PREFIX_CACHE`. A custom model needs an explicit
+`SYSTEM_ONE_NLI_REVISION`.
+
+This first experiment batches every candidate pair. It does not yet reuse the
+shared premise cache by default, so batching lowers latency without removing
+repeated premise computation. Set `SYSTEM_ONE_NLI_PREFIX_CACHE=1` to run each
+candidate batch's shared causal prefix once. It then branches the option
+suffixes from that cache. Float16 cached scores can differ slightly from
+full-pair scores because the model runs in different chunk shapes. Cache mode
+also scores one question at a time. This can reduce batching across separate
+questions. The published checkpoint was trained on 256-token pairs, so longer
+inputs need their own quality checks. The MLX backend remains the default.
+
 Send a request to `POST /evaluate`:
 
 ```bash

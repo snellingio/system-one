@@ -24,6 +24,10 @@ test = [
 labeling = [
     "httpx>=0.28.1",
 ]
+nli = [
+    "torch>=2.9.0",
+    "transformers>=5.15.0",
+]
 ocean = [
     "numpy>=2.5.3",
 ]
