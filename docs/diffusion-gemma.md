@@ -35,8 +35,8 @@ SYSTEM_ONE_BACKEND=mlx-vlm-diffusion-fast \
 The compact profile accepts exactly one question. It removes the long prompt
 instructions and uses one active canvas token. Use it only when the state,
 question, and answer labels make the task clear without extra guidance.
-It runs six full encoder layers. Later layers build lighter attention caches.
-This approximation needs an accuracy check for each target task.
+It still runs the full model. Its speed comes only from the shorter prompt and
+canvas, so it does not use an approximate encoder path.
 
 The first System One startup downloads the pinned 4-bit model snapshot. The
 weights are about 16.5 GB. Both processes use the same Hugging Face cache.
@@ -64,6 +64,8 @@ Start the MLX-VLM server, then run the warmed concurrency sweep from
 uv run python -m tools.benchmark_diffusion
 ```
 
-Use `--json` to save machine-readable results. Set `--requests` and
-`--concurrency` to change the load. The report includes request throughput,
-decision throughput, client latency, and request round-trip latency.
+Use `--json` to save machine-readable results. Set `--requests`,
+`--concurrency`, and `--questions` to change the load. Use
+`--profile fast --questions 1` to measure the compact profile. The report
+includes request throughput, decision throughput, client latency, and request
+round-trip latency.

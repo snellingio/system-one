@@ -29,7 +29,6 @@ DEFAULT_TIMEOUT = 120.0
 CANVAS_PREFIX = "<|channel>thought\n<channel|>"
 CANVAS_SUFFIX = "<turn|>\n"
 DEFAULT_DIFFUSION_SEED = 42
-FAST_DIFFUSION_ENCODER_LAYERS = 6
 
 
 class MlxVlmError(RuntimeError):
@@ -195,9 +194,6 @@ class MlxVlmDiffusionEngine:
             "slots": slots,
             "candidate_only": True,
         }
-        if self.compact:
-            payload["encoder_layers"] = FAST_DIFFUSION_ENCODER_LAYERS
-
         started = time.perf_counter()
         response = self.transport("/v1/diffusion/reads", payload)
         elapsed_ms = (time.perf_counter() - started) * 1000
@@ -206,7 +202,6 @@ class MlxVlmDiffusionEngine:
             slots,
             len(input_ids),
             str(self.model_path),
-            expected_encoder_layers=(FAST_DIFFUSION_ENCODER_LAYERS if self.compact else None),
         )
         return probabilities, len(input_ids), elapsed_ms
 
@@ -228,7 +223,6 @@ class MlxVlmDiffusionEngine:
         slots,
         input_tokens,
         expected_model,
-        expected_encoder_layers=None,
     ):
         try:
             reads = response["reads"]
@@ -236,7 +230,6 @@ class MlxVlmDiffusionEngine:
             reported_tokens = usage["prompt_tokens"]
             denoising_steps = usage["denoising_steps"]
             candidate_only = usage["candidate_only"]
-            encoder_layers = usage.get("encoder_layers")
             model = response["model"]
         except (KeyError, TypeError) as error:
             raise MlxVlmError("MLX-VLM returned an invalid diffusion read response") from error
@@ -246,11 +239,6 @@ class MlxVlmDiffusionEngine:
             raise MlxVlmError(f"MLX-VLM performed {denoising_steps!r} denoising steps, expected 1")
         if candidate_only is not True:
             raise MlxVlmError("MLX-VLM did not confirm candidate-only scoring")
-        if encoder_layers != expected_encoder_layers:
-            raise MlxVlmError(
-                "MLX-VLM used a different encoder layer count: "
-                f"expected {expected_encoder_layers!r}, got {encoder_layers!r}"
-            )
         if reported_tokens != input_tokens:
             raise MlxVlmError(
                 "MLX-VLM token count differs from the pinned tokenizer: "

@@ -21,7 +21,7 @@ from system_one_lite.mlx_vlm_diffusion import (
     build_seed_canvas,
 )
 
-NONCE_START = 100_000
+REQUEST_INDEX_START = 0
 STATE = "Everything is down and we have a demo at noon."
 QUESTIONS = (
     (
@@ -71,29 +71,36 @@ def percentile(values, fraction):
 
 
 class DiffusionClient:
-    def __init__(self, engine):
+    def __init__(self, engine, questions=QUESTIONS):
         self.engine = engine
-        self.questions = tuple((instructions, list(labels)) for instructions, labels in QUESTIONS)
-        state = self._state(NONCE_START)
+        self.questions = tuple((instructions, list(labels)) for instructions, labels in questions)
+        state = self._state()
         self.prompt_tokens = len(
-            build_prompt(engine.tokenizer, state, self.questions, engine.codes)
+            build_prompt(
+                engine.tokenizer,
+                state,
+                self.questions,
+                engine.codes,
+                compact=engine.compact,
+            )
         )
         canvas, _ = build_seed_canvas(
             engine.tokenizer,
             len(self.questions),
             engine.canvas_length,
             engine.vocab_size,
+            compact=engine.compact,
         )
         self.canvas_tokens = len(canvas)
 
     @staticmethod
-    def _state(nonce):
-        return json.dumps({"ticket": STATE, "benchmark_nonce": nonce})
+    def _state():
+        return json.dumps({"ticket": STATE})
 
-    def call(self, nonce):
+    def call(self, _request_index):
         started = time.perf_counter()
         probabilities, prompt_tokens, round_trip_ms = self.engine.evaluate(
-            self._state(nonce), self.questions
+            self._state(), self.questions
         )
         client_ms = (time.perf_counter() - started) * 1000
         if prompt_tokens != self.prompt_tokens:
@@ -105,10 +112,15 @@ class DiffusionClient:
         return Sample(client_ms=client_ms, round_trip_ms=round_trip_ms)
 
 
-def run_level(client, concurrency, request_count, nonce_start):
+def run_level(client, concurrency, request_count, request_index_start):
     started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
-        samples = list(executor.map(client.call, range(nonce_start, nonce_start + request_count)))
+        samples = list(
+            executor.map(
+                client.call,
+                range(request_index_start, request_index_start + request_count),
+            )
+        )
     wall_seconds = time.perf_counter() - started
     request_rate = request_count / wall_seconds
     client_times = [sample.client_ms for sample in samples]
@@ -116,12 +128,12 @@ def run_level(client, concurrency, request_count, nonce_start):
     return Result(
         concurrency=concurrency,
         requests=request_count,
-        decisions_per_request=len(QUESTIONS),
+        decisions_per_request=len(client.questions),
         prompt_tokens=client.prompt_tokens,
         canvas_tokens=client.canvas_tokens,
         wall_seconds=wall_seconds,
         requests_per_second=request_rate,
-        decisions_per_second=request_rate * len(QUESTIONS),
+        decisions_per_second=request_rate * len(client.questions),
         client_median_ms=statistics.median(client_times),
         client_p95_ms=percentile(client_times, 0.95),
         round_trip_median_ms=statistics.median(round_trip_times),
@@ -136,6 +148,8 @@ def main():
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--requests", type=int, default=64)
     parser.add_argument("--concurrency", default="1,2,4,8,16,32")
+    parser.add_argument("--questions", type=int, default=len(QUESTIONS))
+    parser.add_argument("--profile", choices=("full", "fast"), default="full")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     if args.warmup < 0 or args.requests < 1:
@@ -143,22 +157,30 @@ def main():
     concurrency = [int(value) for value in args.concurrency.split(",")]
     if not concurrency or any(value < 1 for value in concurrency):
         parser.error("concurrency values must be positive")
+    if args.questions < 1:
+        parser.error("questions must be positive")
+    if args.profile == "fast" and args.questions != 1:
+        parser.error("the fast profile requires exactly one question")
 
-    engine = MlxVlmDiffusionEngine(base_url=args.base_url)
+    engine = MlxVlmDiffusionEngine(
+        base_url=args.base_url,
+        compact=args.profile == "fast",
+    )
     engine.timeout = args.timeout
-    client = DiffusionClient(engine)
+    questions = tuple(QUESTIONS[index % len(QUESTIONS)] for index in range(args.questions))
+    client = DiffusionClient(engine, questions)
     timed_requests = args.requests * len(concurrency)
-    for nonce in range(args.warmup):
-        client.call(NONCE_START + timed_requests + nonce)
+    for request_index in range(args.warmup):
+        client.call(REQUEST_INDEX_START + timed_requests + request_index)
 
     results = []
-    nonce = NONCE_START
+    request_index = REQUEST_INDEX_START
     for level in concurrency:
-        results.append(run_level(client, level, args.requests, nonce))
-        nonce += args.requests
+        results.append(run_level(client, level, args.requests, request_index))
+        request_index += args.requests
 
     payload = {
-        "backend": "mlx-vlm-diffusion",
+        "backend": ("mlx-vlm-diffusion-fast" if args.profile == "fast" else "mlx-vlm-diffusion"),
         "model": engine.model_id,
         "model_revision": engine.model_revision,
         "base_url": engine.base_url,
@@ -175,6 +197,10 @@ def main():
         print(json.dumps(payload, indent=2))
         return
     print(f"model: {engine.model_id}")
+    print(
+        f"profile: {args.profile}; decisions/request: {len(client.questions)}; "
+        f"prompt tokens: {client.prompt_tokens}; canvas tokens: {client.canvas_tokens}"
+    )
     print("clients  req/s  decisions/s  client p50  client p95  roundtrip p50  roundtrip p95")
     for result in results:
         print(

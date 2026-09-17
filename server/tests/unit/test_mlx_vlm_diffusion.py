@@ -55,7 +55,6 @@ def test_evaluate_reads_all_questions_from_one_seeded_canvas():
                 "prompt_tokens": len(payload["input_ids"]),
                 "denoising_steps": 1,
                 "candidate_only": payload["candidate_only"],
-                "encoder_layers": payload.get("encoder_layers"),
             },
         }
 
@@ -115,7 +114,6 @@ def test_compact_read_uses_one_canvas_token_per_question():
                 "prompt_tokens": len(payload["input_ids"]),
                 "denoising_steps": 1,
                 "candidate_only": payload["candidate_only"],
-                "encoder_layers": payload.get("encoder_layers"),
             },
         }
 
@@ -125,7 +123,7 @@ def test_compact_read_uses_one_canvas_token_per_question():
 
     assert captured["payload"]["seed_canvas"] == [163]
     assert captured["payload"]["slots"] == [{"position": 0, "token_ids": [10, 11]}]
-    assert captured["payload"]["encoder_layers"] == 6
+    assert "encoder_layers" not in captured["payload"]
     assert probabilities[0][1] > probabilities[0][0]
 
 
@@ -157,7 +155,6 @@ def test_response_must_match_requested_slot():
                     "prompt_tokens": 3,
                     "denoising_steps": 1,
                     "candidate_only": True,
-                    "encoder_layers": None,
                 },
             },
             [{"position": 1, "token_ids": [10, 11]}],
@@ -181,7 +178,6 @@ def test_response_must_confirm_model_and_one_step():
             "prompt_tokens": 3,
             "denoising_steps": 1,
             "candidate_only": True,
-            "encoder_layers": None,
         },
     }
 
@@ -201,44 +197,6 @@ def test_response_must_confirm_model_and_one_step():
             [{"position": 1, "token_ids": [10, 11]}],
             3,
             "/pinned/diffusion",
-        )
-
-
-def test_response_must_confirm_fast_read_settings():
-    engine = bare_engine(None)
-    base = {
-        "model": "/pinned/diffusion",
-        "reads": [
-            {
-                "position": 1,
-                "token_ids": [10, 11],
-                "logprobs": [-1.0, -2.0],
-            }
-        ],
-        "usage": {
-            "prompt_tokens": 3,
-            "denoising_steps": 1,
-            "candidate_only": True,
-            "encoder_layers": 6,
-        },
-    }
-
-    with pytest.raises(MlxVlmError, match="invalid diffusion read response"):
-        engine._parse_response(
-            {**base, "usage": {"prompt_tokens": 3, "denoising_steps": 1}},
-            [{"position": 1, "token_ids": [10, 11]}],
-            3,
-            "/pinned/diffusion",
-            expected_encoder_layers=6,
-        )
-
-    with pytest.raises(MlxVlmError, match="different encoder layer count"):
-        engine._parse_response(
-            {**base, "usage": {**base["usage"], "encoder_layers": 30}},
-            [{"position": 1, "token_ids": [10, 11]}],
-            3,
-            "/pinned/diffusion",
-            expected_encoder_layers=6,
         )
 
 
