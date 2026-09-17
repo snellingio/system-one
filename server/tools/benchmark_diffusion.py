@@ -85,11 +85,9 @@ class DiffusionClient:
             )
         )
         canvas, _ = build_seed_canvas(
-            engine.tokenizer,
             len(self.questions),
             engine.canvas_length,
             engine.vocab_size,
-            compact=engine.compact,
         )
         self.canvas_tokens = len(canvas)
 

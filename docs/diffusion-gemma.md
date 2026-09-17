@@ -1,13 +1,12 @@
 # Run with 4-bit DiffusionGemma
 
 This backend uses `mlx-community/diffusiongemma-26B-A4B-it-4bit` at the pinned
-revision in `engine.py`. It sends every question in one prompt and places one
-`- label` answer slot per question in DiffusionGemma's active canvas. This shape
-fits System One's limit of 64 questions. One read-only model pass returns the
-requested answer-code scores. The canvas uses the same fixed seed for each
-request, so the same input has the same canvas.
+revision in `engine.py`. It sends every question in one prompt. It places one
+active canvas token per question. This fits System One's limit of 64 questions.
+One read-only model pass returns the requested answer-code scores. The canvas
+uses the same fixed seed for each request.
 
-The backend needs the `feature/diffusion-gemma-reads` branch of MLX-VLM. That
+The backend needs the `feature/structured-reads` branch of MLX-VLM. That
 branch adds `/v1/diffusion/reads` without changing normal generation.
 
 Start the MLX-VLM server from its checkout:
@@ -33,10 +32,9 @@ SYSTEM_ONE_BACKEND=mlx-vlm-diffusion-fast \
 ```
 
 The compact profile accepts exactly one question. It removes the long prompt
-instructions and uses one active canvas token. Use it only when the state,
-question, and answer labels make the task clear without extra guidance.
-It still runs the full model. Its speed comes only from the shorter prompt and
-canvas, so it does not use an approximate encoder path.
+instructions. Use it only when the state, question, and answer labels make the
+task clear without extra guidance. It still runs the full model. Its speed
+comes only from the shorter prompt.
 
 The first System One startup downloads the pinned 4-bit model snapshot. The
 weights are about 16.5 GB. Both processes use the same Hugging Face cache.

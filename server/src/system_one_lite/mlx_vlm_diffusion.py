@@ -26,8 +26,6 @@ from .engine import (
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8080"
 DEFAULT_TIMEOUT = 120.0
-CANVAS_PREFIX = "<|channel>thought\n<channel|>"
-CANVAS_SUFFIX = "<turn|>\n"
 DEFAULT_DIFFUSION_SEED = 42
 
 
@@ -72,7 +70,7 @@ def build_prompt(tokenizer, state, questions, codes, compact=False):
     for index, (instructions, labels) in enumerate(questions, 1):
         parts.append(f"\n\nQuestion q{index}: {instructions}\n")
         parts.append("\n".join(f"  {codes[i]}: {item}" for i, item in enumerate(labels)))
-    parts.append('\n\nReply with one line per question, in order, formatted as "- label".')
+    parts.append("\n\nReply with one answer code per question, in order.")
     text = tokenizer.apply_chat_template(
         [{"role": "user", "content": "".join(parts)}],
         tokenize=False,
@@ -83,38 +81,19 @@ def build_prompt(tokenizer, state, questions, codes, compact=False):
 
 
 def build_seed_canvas(
-    tokenizer,
     question_count,
     canvas_length,
     vocab_size,
-    compact=False,
 ):
-    """Build the active answer template and randomize only its answer slots."""
-    rng = random.Random(DEFAULT_DIFFUSION_SEED)
-    if compact:
-        if question_count > canvas_length:
-            raise RequestContractError(
-                f"{question_count} questions need {question_count} canvas tokens; "
-                f"DiffusionGemma provides {canvas_length}"
-            )
-        return [rng.randrange(vocab_size) for _ in range(question_count)], list(
-            range(question_count)
-        )
-
-    canvas = _encode(tokenizer, CANVAS_PREFIX)
-    positions = []
-    for _ in range(question_count):
-        canvas.extend(_encode(tokenizer, "-"))
-        positions.append(len(canvas))
-        canvas.append(rng.randrange(vocab_size))
-        canvas.extend(_encode(tokenizer, "\n"))
-    canvas.extend(_encode(tokenizer, CANVAS_SUFFIX))
-    if len(canvas) > canvas_length:
+    """Build one deterministic active canvas token per question."""
+    if question_count > canvas_length:
         raise RequestContractError(
-            f"{question_count} questions need {len(canvas)} canvas tokens; "
+            f"{question_count} questions need {question_count} canvas tokens; "
             f"DiffusionGemma provides {canvas_length}"
         )
-    return canvas, positions
+    rng = random.Random(DEFAULT_DIFFUSION_SEED)
+    canvas = [rng.randrange(vocab_size) for _ in range(question_count)]
+    return canvas, list(range(question_count))
 
 
 class MlxVlmDiffusionEngine:
@@ -174,11 +153,9 @@ class MlxVlmDiffusionEngine:
                 f"request exceeds the {MAX_TOTAL_INPUT_TOKENS} input token limit"
             )
         seed_canvas, positions = build_seed_canvas(
-            self.tokenizer,
             len(questions),
             self.canvas_length,
             self.vocab_size,
-            compact=self.compact,
         )
         slots = [
             {

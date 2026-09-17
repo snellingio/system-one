@@ -7,6 +7,7 @@ from system_one_lite.engine import RequestContractError
 from system_one_lite.mlx_vlm_diffusion import (
     MlxVlmDiffusionEngine,
     MlxVlmError,
+    build_prompt,
     build_seed_canvas,
 )
 
@@ -21,6 +22,16 @@ class FakeTokenizer:
         return "CHAT:" + messages[0]["content"]
 
 
+class TextTokenizer:
+    def encode(self, text, add_special_tokens=False):
+        del add_special_tokens
+        return text
+
+    def apply_chat_template(self, messages, **kwargs):
+        del kwargs
+        return messages[0]["content"]
+
+
 def bare_engine(transport, canvas_length=256):
     engine = MlxVlmDiffusionEngine.__new__(MlxVlmDiffusionEngine)
     engine.model_id = "diffusion"
@@ -33,6 +44,18 @@ def bare_engine(transport, canvas_length=256):
     engine.transport = transport
     engine.compact = False
     return engine
+
+
+def test_full_prompt_asks_for_answer_codes():
+    prompt = build_prompt(
+        TextTokenizer(),
+        "state",
+        [("pick", ["yes", "no"])],
+        ("A", "B"),
+    )
+
+    assert "one answer code per question" in prompt
+    assert '"- label"' not in prompt
 
 
 def test_evaluate_reads_all_questions_from_one_seeded_canvas():
@@ -66,7 +89,9 @@ def test_evaluate_reads_all_questions_from_one_seeded_canvas():
     assert captured["path"] == "/v1/diffusion/reads"
     assert captured["payload"]["model"] == "/pinned/diffusion"
     assert len(captured["payload"]["input_ids"]) == input_tokens
-    assert len(captured["payload"]["seed_canvas"]) < 256
+    assert len(captured["payload"]["seed_canvas"]) == 2
+    assert [slot["position"] for slot in captured["payload"]["slots"]] == [0, 1]
+    assert "encoder_layers" not in captured["payload"]
     assert captured["payload"]["candidate_only"] is True
     assert [slot["token_ids"] for slot in captured["payload"]["slots"]] == [
         [10, 11],
@@ -80,19 +105,17 @@ def test_evaluate_reads_all_questions_from_one_seeded_canvas():
 
 def test_seed_canvas_rejects_more_questions_than_fit():
     with pytest.raises(RequestContractError, match="canvas tokens"):
-        build_seed_canvas(FakeTokenizer(), 2, canvas_length=5, vocab_size=200)
+        build_seed_canvas(6, canvas_length=5, vocab_size=200)
 
 
 def test_seed_canvas_fits_the_public_64_question_limit():
-    first, positions = build_seed_canvas(FakeTokenizer(), 64, canvas_length=256, vocab_size=200)
-    second, second_positions = build_seed_canvas(
-        FakeTokenizer(), 64, canvas_length=256, vocab_size=200
-    )
+    first, positions = build_seed_canvas(64, canvas_length=256, vocab_size=200)
+    second, second_positions = build_seed_canvas(64, canvas_length=256, vocab_size=200)
 
     assert first == second
     assert positions == second_positions
-    assert len(first) <= 256
-    assert len(positions) == 64
+    assert len(first) == 64
+    assert positions == list(range(64))
 
 
 def test_compact_read_uses_one_canvas_token_per_question():
