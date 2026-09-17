@@ -240,3 +240,31 @@ def test_response_must_confirm_fast_read_settings():
             "/pinned/diffusion",
             expected_encoder_layers=6,
         )
+
+
+def test_full_read_accepts_server_without_encoder_layer_metadata():
+    engine = bare_engine(None)
+
+    probabilities = engine._parse_response(
+        {
+            "model": "/pinned/diffusion",
+            "reads": [
+                {
+                    "position": 1,
+                    "token_ids": [10, 11],
+                    "logprobs": [-1.0, -2.0],
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 3,
+                "denoising_steps": 1,
+                "candidate_only": True,
+            },
+        },
+        [{"position": 1, "token_ids": [10, 11]}],
+        3,
+        "/pinned/diffusion",
+    )
+
+    assert len(probabilities) == 1
+    assert math.isclose(sum(probabilities[0]), 1.0)

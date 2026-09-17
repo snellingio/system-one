@@ -236,7 +236,7 @@ class MlxVlmDiffusionEngine:
             reported_tokens = usage["prompt_tokens"]
             denoising_steps = usage["denoising_steps"]
             candidate_only = usage["candidate_only"]
-            encoder_layers = usage["encoder_layers"]
+            encoder_layers = usage.get("encoder_layers")
             model = response["model"]
         except (KeyError, TypeError) as error:
             raise MlxVlmError("MLX-VLM returned an invalid diffusion read response") from error

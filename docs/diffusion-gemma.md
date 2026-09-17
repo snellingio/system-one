@@ -54,3 +54,16 @@ This path differs from the vllm-metal backend in two ways:
 
 The public System One request and response formats do not change. Read-only
 canvas work reports zero output tokens because no tokens are committed.
+
+## Profile the backend
+
+Start the MLX-VLM server, then run the warmed concurrency sweep from
+`server/`:
+
+```bash
+uv run python -m tools.benchmark_diffusion
+```
+
+Use `--json` to save machine-readable results. Set `--requests` and
+`--concurrency` to change the load. The report includes request throughput,
+decision throughput, client latency, and request round-trip latency.
