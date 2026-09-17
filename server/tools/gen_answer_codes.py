@@ -18,7 +18,9 @@ from mlx_lm.utils import load_tokenizer
 
 from system_one_lite.engine import (
     DEFAULT_MODEL,
+    DIFFUSION_GEMMA_MODEL,
     answer_code_entries,
+    diffusion_answer_code_entries,
     resolve_model_id,
     resolve_model_snapshot,
     tokenizer_sha256,
@@ -49,7 +51,10 @@ def main():
         model_id, tokenizer_only=True, revision=args.revision
     )
     tokenizer = load_tokenizer(model_path)
-    entries = answer_code_entries(tokenizer)
+    is_diffusion = model_id == DIFFUSION_GEMMA_MODEL
+    entries = (
+        diffusion_answer_code_entries(tokenizer) if is_diffusion else answer_code_entries(tokenizer)
+    )
     output = Path(args.output) if args.output else default_output(model_id)
     if not output.is_absolute():
         output = Path.cwd() / output
@@ -58,7 +63,11 @@ def main():
         "model": model_id,
         "model_revision": revision,
         "tokenizer_sha256": tokenizer_sha256(model_path),
-        "slot_context": "codes appended after the assistant JSON answer prefix",
+        "slot_context": (
+            "codes occupy one seeded DiffusionGemma canvas token after a list marker"
+            if is_diffusion
+            else "codes appended after the assistant JSON answer prefix"
+        ),
         "codes": entries,
     }
     output.write_text(json.dumps(out, indent=1) + "\n")

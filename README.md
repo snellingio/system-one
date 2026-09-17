@@ -48,9 +48,9 @@ For each question, the server:
 4. Keeps only the logits for valid answer codes and applies softmax.
 5. Maps those probabilities back to the answer names supplied by the caller.
 
-Questions are evaluated independently. Each question gets its own prompt and
-another copy of the state. This prevents one answer from affecting another,
-but runtime and input-token use grow with the number and length of questions.
+The default MLX and vllm-metal backends evaluate questions independently. The
+DiffusionGemma backend instead places all answers in one shared canvas and
+runs one denoising forward.
 
 See [How it works](docs/how-it-works.md) for the prompt format, answer-code
 registry, token limits, and confidence calculation.
@@ -274,6 +274,11 @@ Select a profile before starting the server:
 ```bash
 SYSTEM_ONE_MODEL=larger uv run uvicorn system_one_lite.api:app --port 8010
 ```
+
+To serve the same model through vllm-metal, see the
+[vllm-metal backend guide](docs/vllm-metal.md).
+For seeded, single-forward reads with the 4-bit DiffusionGemma model, see the
+[DiffusionGemma backend guide](docs/diffusion-gemma.md).
 
 The demo, benchmark, and evaluation tools also accept `--model default` or
 `--model larger`. Each supported model has a checked-in registry of answer

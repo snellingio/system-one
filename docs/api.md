@@ -99,8 +99,8 @@ How likely the statement is to be true.
 | --- | --- | --- |
 | `model` | `string` | The engine's own model ID. The default is `mlx-community/Qwen3-1.7B-4bit`. |
 | `answers` | `map<string, Answer>` | One answer per question, keyed by your IDs, in request order. |
-| `usage.input_tokens` | `integer` | Total tokens evaluated across the independent question prompts. |
-| `usage.output_tokens` | `integer` | Always 0. Nothing is generated. |
+| `usage.input_tokens` | `integer` | Prompt tokens evaluated by the selected backend. |
+| `usage.output_tokens` | `integer` | 0 for local MLX and read-only DiffusionGemma. The vllm-metal backend uses one internal output token per question for each group of up to 128 options. |
 
 ### Choice answer
 
@@ -152,5 +152,5 @@ You get an error, never a wrong answer.
 
 Only one inference request runs at a time. If the engine is already in use,
 the server returns `503` with `detail: "the inference engine is busy"`.
-Each question uses a full independent prompt. `usage.input_tokens` counts
-the state again for each question.
+The default MLX and vllm-metal backends count one full prompt per question.
+The DiffusionGemma backend counts one shared prompt for the whole request.
