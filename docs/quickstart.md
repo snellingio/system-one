@@ -149,8 +149,8 @@ Things worth noticing:
   never asks for money back.
 - These probabilities are model scores, not calibrated odds. A value near
   one does not prove that an answer is correct.
-- `usage.output_tokens` is always 0. The engine never generates. Each question
-  uses a full independent prompt.
+- `usage.output_tokens` is 0 for the default and read-only DiffusionGemma
+  backends. The default backend uses a full independent prompt per question.
 
 ## 4. Use the SDK (optional)
 

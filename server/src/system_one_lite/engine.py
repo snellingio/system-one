@@ -23,13 +23,19 @@ from .prompts import chat_filled
 
 QWEN3_1_7B_MODEL = "mlx-community/Qwen3-1.7B-4bit"
 QWEN3_4B_MODEL = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+DIFFUSION_GEMMA_MODEL = "mlx-community/diffusiongemma-26B-A4B-it-4bit"
 MODEL_REVISIONS = {
     QWEN3_1_7B_MODEL: "3b1b1768f8f8cf8351c712464f906e86c2b8269e",
     QWEN3_4B_MODEL: "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+    DIFFUSION_GEMMA_MODEL: "a7a81407613811e8ba63af92ac0d852b809e191f",
 }
 DEFAULT_MODEL = QWEN3_1_7B_MODEL
 LARGER_MODEL = QWEN3_4B_MODEL
-MODEL_PROFILES = {"default": DEFAULT_MODEL, "larger": LARGER_MODEL}
+MODEL_PROFILES = {
+    "default": DEFAULT_MODEL,
+    "larger": LARGER_MODEL,
+    "diffusion": DIFFUSION_GEMMA_MODEL,
+}
 CODES_FILE = files("system_one_lite.data").joinpath("qwen3_1_7b_4bit_answer_codes.json")
 TEMPERATURE = 0.7
 MAX_PROMPT_TOKENS = 32_768
@@ -47,6 +53,7 @@ TOKENIZER_FILES = (
 ANSWER_CODE_CANDIDATES = tuple(string.ascii_uppercase) + tuple(
     a + b for a in string.ascii_uppercase for b in string.ascii_uppercase
 )
+MAX_ANSWER_CODES = 578
 _REGISTERED_IDS = object()
 
 
@@ -129,7 +136,25 @@ def answer_code_entries(tokenizer):
         )
     if len(cuts) != 1:
         raise ValueError(f"codes land at different cut positions: {sorted(cuts)}")
-    return entries
+    return entries[:MAX_ANSWER_CODES]
+
+
+def diffusion_answer_code_entries(tokenizer):
+    """Build codes that occupy one seeded-canvas token after a list marker."""
+    entries = []
+    for code in ANSWER_CODE_CANDIDATES:
+        token_ids = tokenizer.encode(" " + code, add_special_tokens=False)
+        if len(token_ids) != 1:
+            continue
+        token_id = token_ids[0]
+        entries.append(
+            {
+                "code": code,
+                "token": tokenizer.decode([token_id]),
+                "token_id": token_id,
+            }
+        )
+    return entries[:MAX_ANSWER_CODES]
 
 
 def _registry_files():
@@ -143,8 +168,8 @@ def _registry_files():
     )
 
 
-def load_code_registry(model_id, tokenizer, model_path, model_revision):
-    """Find and fully validate one model's answer-code registry."""
+def packaged_code_registry(model_id):
+    """Load one packaged registry without loading the model or tokenizer."""
     matches = []
     for path in _registry_files():
         data = json.loads(path.read_text())
@@ -157,6 +182,19 @@ def load_code_registry(model_id, tokenizer, model_path, model_revision):
         )
 
     path, data = matches[0]
+    entries = data.get("codes") or []
+    codes = tuple(entry["code"] for entry in entries)
+    token_ids = tuple(entry["token_id"] for entry in entries)
+    if not codes or codes[0] != "A":
+        raise ValueError(f"{path.name} must start with the A answer code")
+    if len(codes) != len(set(codes)) or len(token_ids) != len(set(token_ids)):
+        raise ValueError(f"{path.name} contains duplicate codes or token ids")
+    return path, data, codes, token_ids
+
+
+def load_code_registry(model_id, tokenizer, model_path, model_revision):
+    """Find and fully validate one model's answer-code registry."""
+    path, data, codes, token_ids = packaged_code_registry(model_id)
     expected_hash = tokenizer_sha256(model_path)
     if data.get("model_revision") != model_revision:
         raise ValueError(
@@ -166,16 +204,14 @@ def load_code_registry(model_id, tokenizer, model_path, model_revision):
     if data.get("tokenizer_sha256") != expected_hash:
         raise ValueError(f"{path.name} does not match the loaded tokenizer; regenerate it")
 
-    expected = answer_code_entries(tokenizer)
+    if model_id == DIFFUSION_GEMMA_MODEL:
+        expected = diffusion_answer_code_entries(tokenizer)
+    else:
+        expected = answer_code_entries(tokenizer)
     if data.get("codes") != expected:
         raise ValueError(f"{path.name} is incomplete or invalid for {model_id}; regenerate it")
-    codes = tuple(entry["code"] for entry in expected)
-    token_ids = tuple(entry["token_id"] for entry in expected)
-    if not codes or codes[0] != "A":
-        raise ValueError(f"{path.name} must start with the A answer code")
-    if len(codes) != len(set(codes)) or len(token_ids) != len(set(token_ids)):
-        raise ValueError(f"{path.name} contains duplicate codes or token ids")
-    validate_code_contexts(tokenizer, codes, token_ids)
+    if model_id != DIFFUSION_GEMMA_MODEL:
+        validate_code_contexts(tokenizer, codes, token_ids)
     return path, codes, token_ids
 
 
@@ -243,6 +279,10 @@ class Engine:
         self.template = partial(chat_filled, self.tokenizer, codes=self.codes)
         # warm up: compile Metal kernels before the first real request
         self.evaluate("warm up", [("pick one", ["yes", "no"])])
+
+    def output_tokens_for(self, questions):
+        """Return the generated-token count for one prepared request."""
+        return 0
 
     def evaluate(self, state, questions, template=None):
         """Run one independent full prompt per question.

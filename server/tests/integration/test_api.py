@@ -7,11 +7,13 @@ from fastapi.testclient import TestClient
 from system_one_lite import api as api_module
 from system_one_lite.api import app, create_app
 from system_one_lite.engine import RequestContractError
+from system_one_lite.mlx_vlm_diffusion import MlxVlmError
 from system_one_lite.schemas import (
     MAX_QUESTIONS,
     MAX_REQUEST_BYTES,
     MAX_STATE_CHARS,
 )
+from system_one_lite.vllm_metal import VllmMetalError
 
 client = None
 test_app = None
@@ -47,6 +49,99 @@ def test_configured_engine_uses_selected_profile(monkeypatch):
 
     assert api_module.configured_engine() is None
     assert selected == ["larger"]
+
+
+def test_configured_engine_can_select_vllm_metal(monkeypatch):
+    selected = []
+    monkeypatch.setenv("SYSTEM_ONE_BACKEND", "vllm-metal")
+    monkeypatch.setenv("SYSTEM_ONE_MODEL", "larger")
+    monkeypatch.setattr(api_module, "VllmMetalEngine", selected.append)
+
+    assert api_module.configured_engine() is None
+    assert selected == ["larger"]
+
+
+def test_configured_engine_can_select_mlx_vlm_diffusion(monkeypatch):
+    selected = []
+    monkeypatch.setenv("SYSTEM_ONE_BACKEND", "mlx-vlm-diffusion")
+    monkeypatch.delenv("SYSTEM_ONE_MODEL", raising=False)
+    monkeypatch.setattr(api_module, "MlxVlmDiffusionEngine", selected.append)
+
+    assert api_module.configured_engine() is None
+    assert selected == [None]
+
+
+def test_configured_engine_rejects_unknown_backend(monkeypatch):
+    monkeypatch.setenv("SYSTEM_ONE_BACKEND", "unknown")
+
+    with pytest.raises(ValueError, match="unknown SYSTEM_ONE_BACKEND"):
+        api_module.configured_engine()
+
+
+def test_vllm_metal_usage_counts_internal_read_tokens():
+    class FakeVllmMetalEngine:
+        model_id = "test-model"
+
+        def evaluate(self, state, questions):
+            return [[0.75, 0.25] for _ in questions], 20, 1.0
+
+        def output_tokens_for(self, questions):
+            return len(questions)
+
+    request = {
+        "state": "state",
+        "questions": {
+            "first": {"type": "noul", "instructions": "first?"},
+            "second": {"type": "noul", "instructions": "second?"},
+        },
+    }
+    with TestClient(create_app(engine=FakeVllmMetalEngine())) as vllm_client:
+        response = vllm_client.post("/evaluate", json=request)
+
+    assert response.status_code == 200
+    assert response.json()["usage"] == {"input_tokens": 20, "output_tokens": 2}
+
+
+def test_vllm_metal_failure_becomes_bad_gateway():
+    class FailedVllmMetalEngine:
+        model_id = "test-model"
+
+        def evaluate(self, state, questions):
+            raise VllmMetalError("server unavailable")
+
+        def output_tokens_for(self, questions):
+            return len(questions)
+
+    request = {
+        "state": "state",
+        "questions": {"first": {"type": "noul", "instructions": "first?"}},
+    }
+    with TestClient(create_app(engine=FailedVllmMetalEngine())) as vllm_client:
+        response = vllm_client.post("/evaluate", json=request)
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "server unavailable"
+
+
+def test_mlx_vlm_failure_becomes_bad_gateway():
+    class FailedDiffusionEngine:
+        model_id = "test-model"
+
+        def evaluate(self, state, questions):
+            raise MlxVlmError("diffusion server unavailable")
+
+        def output_tokens_for(self, questions):
+            return 0
+
+    request = {
+        "state": "state",
+        "questions": {"first": {"type": "noul", "instructions": "first?"}},
+    }
+    with TestClient(create_app(engine=FailedDiffusionEngine())) as diffusion_client:
+        response = diffusion_client.post("/evaluate", json=request)
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "diffusion server unavailable"
 
 
 def test_quickstart_mixed_three_questions():

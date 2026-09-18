@@ -1,9 +1,13 @@
 # How it works
 
-The engine (`server/src/system_one_lite/engine.py`) never decodes text. It builds one full prompt
-for each question. The next token must be an answer code. The engine runs a
-forward pass and reads the code probabilities at that position. It generates
-no tokens.
+The default engine (`server/src/system_one_lite/engine.py`) never decodes text.
+It builds one full prompt for each question. The next token must be an answer
+code. The engine runs a forward pass and reads the code probabilities at that
+position. It generates no tokens.
+
+The optional DiffusionGemma backend keeps the same public API but uses one
+shared prompt and a seeded answer canvas. See [Run with 4-bit
+DiffusionGemma](diffusion-gemma.md).
 
 This page walks through the pieces so you can read the code alongside it.
 

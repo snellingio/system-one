@@ -11,6 +11,7 @@ from threading import BoundedSemaphore
 from fastapi import FastAPI, HTTPException
 
 from .engine import Engine, RequestContractError
+from .mlx_vlm_diffusion import MlxVlmDiffusionEngine, MlxVlmError
 from .prompts import as_text, confidence, label
 from .schemas import (
     ChoiceAnswer,
@@ -22,11 +23,24 @@ from .schemas import (
     ScoreAnswer,
     Usage,
 )
+from .vllm_metal import VllmMetalEngine, VllmMetalError
 
 
 def configured_engine():
     """Build the process-wide engine from a named profile or exact model ID."""
-    return Engine(os.environ.get("SYSTEM_ONE_MODEL"))
+    backend = os.environ.get("SYSTEM_ONE_BACKEND", "mlx")
+    if backend == "mlx":
+        return Engine(os.environ.get("SYSTEM_ONE_MODEL"))
+    if backend == "vllm-metal":
+        return VllmMetalEngine(os.environ.get("SYSTEM_ONE_MODEL"))
+    if backend == "mlx-vlm-diffusion":
+        return MlxVlmDiffusionEngine(os.environ.get("SYSTEM_ONE_MODEL"))
+    if backend == "mlx-vlm-diffusion-fast":
+        return MlxVlmDiffusionEngine(
+            os.environ.get("SYSTEM_ONE_MODEL"),
+            compact=True,
+        )
+    raise ValueError(f"unknown SYSTEM_ONE_BACKEND {backend!r}")
 
 
 def labels_for(question):
@@ -86,13 +100,20 @@ def create_app(
             raise HTTPException(503, "the inference engine is busy")
 
         runtime_engine = app.state.engine
+        engine_questions = [
+            (as_text(question.instructions), labels_for(question)) for _, question in items
+        ]
         try:
             results, input_tokens, elapsed_ms = runtime_engine.evaluate(
                 as_text(req.state),
-                [(as_text(question.instructions), labels_for(question)) for _, question in items],
+                engine_questions,
             )
         except RequestContractError as error:
             raise HTTPException(422, str(error)) from error
+        except VllmMetalError as error:
+            raise HTTPException(502, str(error)) from error
+        except MlxVlmError as error:
+            raise HTTPException(502, str(error)) from error
         finally:
             app.state.inference_slot.release()
 
@@ -107,7 +128,10 @@ def create_app(
                 question_id: answer_for(question, probabilities)
                 for (question_id, question), probabilities in zip(items, results)
             },
-            usage=Usage(input_tokens=input_tokens, output_tokens=0),
+            usage=Usage(
+                input_tokens=input_tokens,
+                output_tokens=runtime_engine.output_tokens_for(engine_questions),
+            ),
         )
 
     return app
